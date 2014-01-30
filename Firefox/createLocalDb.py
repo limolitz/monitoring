@@ -10,5 +10,5 @@ dbConnection = sql.connect('firefoxProcesses.db')
 with dbConnection:
         dbCursor = dbConnection.cursor()
         if args.dropDB:
-                dbCursor.execute("DROP TABLE IF EXISTS chrome")
+                dbCursor.execute("DROP TABLE IF EXISTS firefox")
         dbCursor.execute("CREATE TABLE firefox (date INT PRIMARY KEY, profile TEXT, tabs INT)")
