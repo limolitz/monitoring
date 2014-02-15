@@ -5,6 +5,7 @@ import json
 import subprocess
 from pickle import dump, load
 from urlparse import urlparse
+import re
 
 # This script stores the number of opened tabs in Firefox and the URL of the current selected tab if Firefox is focused. The script should be called quite often, as the visit time is only counted in steps between calls of the script
 # Known bugs/limitations:
@@ -14,7 +15,7 @@ from urlparse import urlparse
 # loosely based on https://stackoverflow.com/questions/15884363/in-mozilla-firefox-how-do-i-extract-the-number-of-currently-opened-tabs-to-save
 # sessionstore.js is created with this code:https://hg.mozilla.org/integration/fx-team/file/2b9e5948213f/browser/components/sessionstore/src/SessionStore.jsm
 
-# lastAccessed was introduced in this Bugzilla entry: https://bugzilla.mozilla.org/show_bug.cgi?id=739866
+# lastAccessed was introduced with this Bugzilla entry: https://bugzilla.mozilla.org/show_bug.cgi?id=739866
 
 
 def loadSessionJSON(sessionfile):
@@ -51,18 +52,20 @@ def saveToDatabase():
 		con = sql.connect(getPathToDB())
 		cur = con.cursor()
 		loadSessionJSON('/home/florin/.mozilla/firefox/3wxc4x2q.default/sessionstore.js');
-		cur.execute("INSERT OR REPLACE INTO firefox VALUES (?,?,?)", (datetime.datetime.now().strftime("%s"), 'standard', getOpenedFirefoxTabs()));
+		cur.execute("INSERT OR REPLACE INTO tabNumber VALUES (?,?,?)", (datetime.datetime.now().strftime("%s"), 'standard', getOpenedFirefoxTabs()));
 		con.commit();
 		#map(getAccessedDateOfTab, j['windows'][0]['tabs']);
 
 		# check if foreground window belongs to Firefox
 		cmdline = subprocess.Popen('/home/florin/bin/QuantifiedSelf/Firefox/getForegroundWindow.sh', stdout=subprocess.PIPE).stdout.read().strip();
 		print "Current foreground process is "+cmdline;
+		# TODO(wasmitnetzen): Remove kate (debug only)
 		if cmdline.find('firefox') != -1 or cmdline.find('kate') != -1:
 			# index for selected tab is off by one: https://hg.mozilla.org/integration/fx-team/file/2b9e5948213f/browser/components/sessionstore/src/SessionStore.jsm#l2822
 			# *        Index of selected tab (1 is first tab, 0 no selected tab)
 			#print "The url "+j['windows'][0]['tabs'][j['windows'][0]['selected']-1]['entries'][0]['url'] + " is opened.";
 			# get hostname
+			# TODO(wasmitnetzen): about:newtab? about:blank?
 			parsedUrl = urlparse(j['windows'][0]['tabs'][j['windows'][0]['selected']-1]['entries'][0]['url']);
 			hostname = parsedUrl.hostname;
 			print "A site on host "+hostname+" is opened";
@@ -83,18 +86,36 @@ def saveToDatabase():
 			print str(diff.total_seconds()) + " seconds ago";
 
 
+			#read uptime file
+			uptimeFile = open('/proc/uptime', 'r');
+			lines = uptimeFile.read();
+
+
+			# get first entry of file
+			firstEntryObj = re.match('^[0-9]*', lines);
+			uptime=datetime.timedelta(0, int(firstEntryObj.group()));
+
+			print "Uptime: " + str(uptime.total_seconds()) +' vs. ', diff.total_seconds();
 			# if this time is longer than the uptime, the computer was shut off between runs => use uptime as diff length
-			#TODO(wasMitNetzen): read uptime file directly
-			uptime = datetime.timedelta(0, int(subprocess.Popen('/bin/cat /proc/uptime | grep -oP "^[0-9]*"', shell=True, stdout=subprocess.PIPE).stdout.read().strip()));
-			print "Uptime: " + str(uptime.total_seconds());
-			if uptime > diff:
+			if diff > uptime:
+				print 'Use uptime';
 				diff = uptime;
 
 			# check if hostname has already an entry
+			cur.execute('SELECT * FROM focusedSite WHERE host = "'+hostname+'" AND profile="standard"');
+			data = cur.fetchone();
 
-			# if not, make new entry
-
-			#
+			#print hostname "Last entry from date ",data[0],", uptime ",data[3];
+			# no entry found
+			if data is None:
+				print('New entry made for host '+hostname+' with time '+str(diff.total_seconds())+'.');
+				cur.execute("INSERT INTO focusedSite(profile, host, firstVisit, time) VALUES (?,?,?,?)", ('standard', hostname, datetime.datetime.now().strftime("%s"), diff.total_seconds()));
+			# update last record
+			else:
+				totalDiff = diff + datetime.timedelta(0, data[4]);
+				print 'Update last record. '+str(data[4])+' + '+str(diff.total_seconds())+' = '+str(totalDiff.total_seconds())+'.';
+				cur.execute("UPDATE focusedSite SET time = ? WHERE host=? AND profile=?",(totalDiff.total_seconds(), hostname, 'standard'));
+			con.commit();
 		f = open('stor.temp', 'w');
 		now = datetime.datetime.now();
 		#print "dumping "+str(now);
