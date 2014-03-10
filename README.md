@@ -10,4 +10,4 @@ Currently working scripts:
 
 Not yet working:
 * Logging of visited sites and duration in Firefox
-* Counting sent and reveived mails over IMAP
+* Count sent and reveived mails over IMAP
