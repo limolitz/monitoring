@@ -1,6 +1,9 @@
+<<<<<<< HEAD
 # Quantified Self Scripts
 
 Or: I'm learning python.
+
+My Quantified Self scripts. Currently mainly focused on collecting data of my computer.
 
 Each folder consists of a script which logs its data to a database, a script to create the database and a script to plot the results.
 
