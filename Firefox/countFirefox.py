@@ -76,7 +76,7 @@ def saveToDatabase():
 				lastRun = load(tempFile);
 				tempFile.close();
 			except (OSError, IOError, TypeError, EOFError, IndexError) as e:
-				#on any expectable error, don't count this run
+				#on any sort of expectable error, don't count this run
 				lastRun = datetime.datetime.now();
 
 			print "last run was on "+str(lastRun);
@@ -108,17 +108,16 @@ def saveToDatabase():
 			#print hostname "Last entry from date ",data[0],", uptime ",data[3];
 			# no entry found
 			if data is None:
-				print('New entry made for host '+hostname+' with time '+str(diff.total_seconds())+'.');
+				print 'New entry made for host '+hostname+' with time ',diff.total_seconds(),'.';
 				cur.execute("INSERT INTO focusedSite(profile, host, firstVisit, time) VALUES (?,?,?,?)", ('standard', hostname, datetime.datetime.now().strftime("%s"), diff.total_seconds()));
 			# update last record
 			else:
 				totalDiff = diff + datetime.timedelta(0, data[4]);
-				print 'Update last record. '+str(data[4])+' + '+str(diff.total_seconds())+' = '+str(totalDiff.total_seconds())+'.';
+				print 'Update last record.',data[4],'+',diff.total_seconds(),'=',totalDiff.total_seconds(),'.';
 				cur.execute("UPDATE focusedSite SET time = ? WHERE host=? AND profile=?",(totalDiff.total_seconds(), hostname, 'standard'));
 			con.commit();
 		f = open('stor.temp', 'w');
 		now = datetime.datetime.now();
-		#print "dumping "+str(now);
 		dump(now, f);
 		f.close()
 
