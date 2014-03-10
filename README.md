@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Quantified Self Scripts
 
 Or: I'm learning python.
