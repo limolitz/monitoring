@@ -1,7 +1,7 @@
 #!/bin/bash
-LANGUAGE=en_US;
+export LANGUAGE=en_US;
 # Grep from http://meinit.nl/shell-script-measure-network-throughput-linux-machines
 # received traffic
-ifconfig eth0 | grep 'RX bytes' | cut -d: -f2 | awk '{ print $1 }';
+/sbin/ifconfig eth0 | /bin/grep 'RX bytes' | /usr/bin/cut -d: -f2 | /usr/bin/awk '{ print $1 }';
 # sent traffic
-ifconfig eth0 | grep 'TX bytes' | cut -d: -f3 | awk '{ print $1 }';
+/sbin/ifconfig eth0 | /bin/grep 'TX bytes' | /usr/bin/cut -d: -f3 | /usr/bin/awk '{ print $1 }';
