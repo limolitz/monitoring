@@ -17,11 +17,10 @@ def plot():
 		g = Gnuplot.Gnuplot(persist=1)
 		g('set term png truecolor size 1000,500 font "Helvetica, 13pt" ')
 		g('set output "traffic.png"')
-		g('set title "Traffic per day"')
+		g('set title "Traffic per run"')
 		g('set grid')
 		g('set grid mxtics')
 		g('set style data boxes')
-		g('set boxwidth 0.8 relative')
 		g('set style fill solid 0.7')
 
 
