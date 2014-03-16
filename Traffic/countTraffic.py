@@ -33,7 +33,7 @@ def saveToDatabase():
 		# no entry found or uptime is smaller than on last record, make new entry
 		if data is None or (uptime < data[3]):
 			print('New entry made.')
-			cur.execute("INSERT INTO traffic VALUES (?,?,?,?)", (datetime.datetime.now().strftime("%s"), traffic[0], traffic[1], uptime));
+			cur.execute("INSERT INTO traffic VALUES (?,?,?,?)", (datetime.datetime.utcnow().strftime("%s"), traffic[0], traffic[1], uptime));
 			# if greater => same computer run, update last record
 		elif uptime > data[3]:
 			cur.execute("UPDATE traffic set uptime = ?, trafficRX=?, trafficTX=? where date=?",(uptime, traffic[0], traffic[1], data[0]));
