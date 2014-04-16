@@ -1,0 +1,5 @@
+[Account]
+server = example.com
+port = 993
+user = user@example
+password = hunter2
