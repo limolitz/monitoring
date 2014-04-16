@@ -8,4 +8,4 @@ Dependencies:
 * Gnuplot
 
 Example:
-![Sample Plot from April 2014][mails_42014.png]
+![Sample Plot from April 2014](https://raw.githubusercontent.com/wasmitnetzen/QuantifiedSelf/master/Mails/mails_42014.png)
