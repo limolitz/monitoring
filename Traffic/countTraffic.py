@@ -29,7 +29,8 @@ def saveToDatabase():
 		cur.execute('SELECT * FROM traffic WHERE date = (SELECT MAX(date) FROM traffic)');
 		data = cur.fetchone()
 
-		print "Last entry from date ",data[0],", uptime ",uptime," vs. ",data[3];
+		if not data is None:
+			print "Last entry from date ",data[0],", uptime ",uptime," vs. ",data[3];
 		# no entry found or uptime is smaller than on last record, make new entry
 		if data is None or (uptime < data[3]):
 			print('New entry made.')
