@@ -11,4 +11,4 @@ with dbConnection:
         dbCursor = dbConnection.cursor()
         if args.dropDB:
                 dbCursor.execute("DROP TABLE IF EXISTS traffic")
-        dbCursor.execute("CREATE TABLE traffic (date INT PRIMARY KEY, trafficRX INT, trafficTX INT, uptime INT)")
+        dbCursor.execute("CREATE TABLE traffic (date INT PRIMARY KEY, trafficRX INT, trafficTX INT, uptime INT, totalTrafficRX INT, totalTrafficTX int)")

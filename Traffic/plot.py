@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 import sqlite3 as sql
 import datetime
+
 import Gnuplot
+import sys
 
 
 def getPathToDB():
@@ -10,42 +12,83 @@ def getPathToDB():
 def plot():
 	con = None
 	try:
+		# plot current month per default
+		# read params
+		if len(sys.argv) > 3 or len(sys.argv) < 1:
+			print "Usage: python bankClient.py beginTimeStamp endTimestamp"
+			print "              bankClient.py lastNDays"
+			print "              bankClient.py"
+			exit()
+		#else:
+		#	print(len(sys.argv))
+		
+		tic = ""
+		title = "Traffic"
+		if len(sys.argv) == 3:
+			begin = datetime.fromtimestamp(sys.argv[1]) # start
+			end = datetime.fromtimestamp(sys.argv[2]) # end
+			tic=str(60*60*24*2)
+		elif len(sys.argv) == 2:
+			begin = datetime.datetime.today()-datetime.timedelta(days=int(sys.argv[1]))
+			end = datetime.datetime.today() # end
+			# tic
+			tic=str(60*60*24*0.3)
+			title = "Traffic last "+sys.argv[1]+" days"
+		else:
+			title = "Traffic this month"
+			begin = datetime.date(datetime.datetime.today().year, datetime.datetime.today().month, 1)
+			end = datetime.date(datetime.datetime.today().year, datetime.datetime.today().month+1, 1)-datetime.timedelta(1) # end
+			tic = str(60*60*24*2)
+		
+		title = title+" as per "+datetime.datetime.today().strftime("%d.%m.%Y, %H:%M")
+		print("Begin: "+str(begin))
+		print("End: "+str(end))
 		con = sql.connect(getPathToDB())
 		cur = con.cursor()
-		cur.execute('SELECT date, trafficRX, trafficTX, uptime FROM traffic ORDER BY date');
+		print('SELECT date, trafficRX, trafficTX, uptime FROM traffic WHERE date > '+begin.strftime("%s")+' AND date < '+end.strftime("%s")+' ORDER BY date')
+		cur.execute('SELECT date, trafficRX, trafficTX, uptime FROM traffic WHERE date > '+begin.strftime("%s")+' AND date < '+end.strftime("%s")+' ORDER BY date');
 		data = cur.fetchall();
-
+		#print(data)
+		adjustedData = []
+		lastTX = 0;
+		lastRX = 0;
+		dataFile = open("traffic.data", "w")
+		for date in data:
+			adjustedDate = []
+			adjustedDate.append(date[0])
+			lastRX = date[1]+lastRX
+			adjustedDate.append(lastRX )
+			lastTX = date[2]+lastTX
+			adjustedDate.append(lastTX)
+			adjustedDate.append(date[3])
+			adjustedData.append(adjustedDate)
+			dataFile.write(str(date[0])+"	"+str(lastRX)+"	"+str(lastTX)+"	"+str(date[3])+"\n")
+		dataFile.close()
+		
+		
 		# build overall traffic counter
 		counter = 0;
 		overallTraffic = [];
 		for index in range(len(data)):
 			counter += data[index][1]+data[index][2];
 			overallTraffic.append((data[index][0]+data[index][3]/2, counter));
-		#print data[1]
-		#print datetime.datetime.utcfromtimestamp(data[0][0]);
-		#delta = datetime.timedelta(0, int(data[0][3]));
-		#print delta;
-		#print datetime.datetime.utcfromtimestamp(data[0][0])+delta;
 
-		#print overallTraffic;
 		g = Gnuplot.Gnuplot(persist=1)
-		g('set term png truecolor size 1000,750 font "Helvetica, 13pt" ')
+		g('set term png truecolor size 700,400 font "Helvetica, 13pt" ')
 		g('set output "traffic.png"')
-		g('set title "Traffic per run"')
+		g('set title "'+title+'"')
 		g('set grid')
 		g('set grid mxtics')
 		g('set style data boxes')
 		g('set style fill solid 0.7')
 
-
 		g('set xdata time')
 		# parse timestamp
 		g('set timefmt "%s"')
 		# set ad day-month
-		g('set format x "%d.%m."')
-		#g('set format x "%s"')
+		g('set format x "%d.%m. %H:%M:%S"')		
 		# tic with 1 day
-		g('set xtic '+str(60*60*24*1))
+		g('set xtic '+tic)
 		g('set xlabel "Date (UTC)"')
 		g('set autoscale x')
 
@@ -54,19 +97,13 @@ def plot():
 		g('set ylabel "Traffic per run (GiB)"')
 		g('set yrange [0:]')
 
-		g('set y2tic 16')
-		g('set autoscale y2')
-		g('set y2label "Overall Traffic (GiB)"')
-		g('set y2range [0:]')
-
 		g('set key center bottom outside horizontal')
 
-		# Plot bytes in MiB (divide by 1024^2)
-		plot1 = Gnuplot.PlotItems.Data(data, using="($1+($4/2)):($2/1024**3):4", title="Received")
-		plot2 = Gnuplot.PlotItems.Data(data, using="($1+($4/2)):(($2+$3)/1024**3):4", title="Transmitted")
-		plot3 = Gnuplot.PlotItems.Data(overallTraffic, title="Overall Traffic", with_="steps", using="1:($2/1024**3)", axes="x1y2")
+		# Plot bytes in GiB (divide by 1024^3)
+		plot1 = Gnuplot.PlotItems.File("traffic.data", using="($1-($4/2)):($2/1024**3):4", title="Received")
+		plot2 = Gnuplot.PlotItems.File("traffic.data", using="($1-($4/2)):(($2+$3)/1024**3):4", title="Transmitted")		
 
-		g.plot(plot2, plot1, plot3)
+		g.plot(plot2, plot1)#, plot3)
 
 	except sql.Error, e:
 		print "Error %s:" % e.args[0]

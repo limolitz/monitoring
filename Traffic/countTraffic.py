@@ -8,7 +8,7 @@ def getPathToDB():
 
 def trafficInBytes():
 	bytes = subprocess.Popen('/home/florin/bin/QuantifiedSelf/Traffic/callIfconfig.sh', stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True,).stdout.read().split();
-	print bytes
+	#print bytes
 	return bytes
 
 def uptimeInSeconds():
@@ -28,19 +28,22 @@ def saveToDatabase():
 		# get last entry
 		cur.execute('SELECT * FROM traffic WHERE date = (SELECT MAX(date) FROM traffic)');
 		data = cur.fetchone()
+		print(data)
 
 		if not data is None:
 			print "Last entry from date ",data[0],", uptime ",uptime," vs. ",data[3];
-		# no entry found or uptime is smaller than on last record, make new entry
-		if data is None or (uptime < data[3]):
+		# no entry found or traffic is smaller than on last record, make new entry
+		if data is None or traffic[0]<data[4]:
 			print('New entry made.')
-			cur.execute("INSERT INTO traffic VALUES (?,?,?,?)", (datetime.datetime.utcnow().strftime("%s"), traffic[0], traffic[1], uptime));
-			# if greater => same computer run, update last record
-		elif uptime > data[3]:
-			cur.execute("UPDATE traffic set uptime = ?, trafficRX=?, trafficTX=? where date=?",(uptime, traffic[0], traffic[1], data[0]));
-			print 'Updated ',data[0],' to uptime ',data[3];
+			cur.execute("INSERT INTO traffic VALUES (?,?,?,?,?,?)", (datetime.datetime.utcnow().strftime("%s"), traffic[0], traffic[1], uptime, traffic[0], traffic[1]));
+		# if greater => same computer run, calculate difference and make new record
 		else:
-			print 'Error'
+			diffTraffic0 = int(traffic[0])-int(data[4])
+			diffTraffic1 = int(traffic[1])-int(data[5])
+			diffUptime = int(datetime.datetime.utcnow().strftime("%s"))-int(data[0])
+			print("Make new entry with RX "+str(diffTraffic0)+", TX "+str(diffTraffic1)+" and diffUptime "+str(diffUptime)+".")
+			cur.execute("INSERT INTO traffic VALUES (?,?,?,?,?,?)", (datetime.datetime.utcnow().strftime("%s"), diffTraffic0, diffTraffic1, diffUptime, traffic[0], traffic[1]));
+			#cur.execute("UPDATE traffic set uptime = ?, trafficRX=?, trafficTX=? where date=?",(uptime, traffic[0], traffic[1], data[0]));
 		con.commit();
 
 	except sql.Error, e:
