@@ -4,6 +4,7 @@ import datetime
 
 import Gnuplot
 import sys
+import subprocess
 
 
 def getPathToDB():
@@ -24,15 +25,16 @@ def plot():
 		
 		tic = ""
 		title = "Traffic"
+		machineName = subprocess.Popen('uname -n', stdout=subprocess.PIPE, shell=True).stdout.read().strip()
 		if len(sys.argv) == 3:
-			begin = datetime.fromtimestamp(sys.argv[1]) # start
-			end = datetime.fromtimestamp(sys.argv[2]) # end
-			tic=str(60*60*24*2)
+			begin = datetime.datetime.fromtimestamp(int(sys.argv[1])) # start
+			end = datetime.datetime.fromtimestamp(int(sys.argv[2])) # end
+			tic=str(60*60*24*0.02)
 		elif len(sys.argv) == 2:
 			begin = datetime.datetime.today()-datetime.timedelta(days=int(sys.argv[1]))
 			end = datetime.datetime.today() # end
 			# tic
-			tic=str(60*60*24*0.3)
+			tic=str(60*60*24*2)
 			title = "Traffic last "+sys.argv[1]+" days"
 		else:
 			title = "Traffic this month"
@@ -57,7 +59,7 @@ def plot():
 			adjustedDate = []
 			adjustedDate.append(date[0])
 			lastRX = date[1]+lastRX
-			adjustedDate.append(lastRX )
+			adjustedDate.append(lastRX)
 			lastTX = date[2]+lastTX
 			adjustedDate.append(lastTX)
 			adjustedDate.append(date[3])
@@ -76,7 +78,7 @@ def plot():
 		g = Gnuplot.Gnuplot(persist=1)
 		g('set term png truecolor size 700,400 font "Helvetica, 13pt" ')
 		g('set output "traffic.png"')
-		g('set title "'+title+'"')
+		g('set title "'+title+' on '+machineName+'"')
 		g('set grid')
 		g('set grid mxtics')
 		g('set style data boxes')
@@ -86,15 +88,15 @@ def plot():
 		# parse timestamp
 		g('set timefmt "%s"')
 		# set ad day-month
-		g('set format x "%d.%m. %H:%M:%S"')		
+		g('set format x "%d.%m."')		
 		# tic with 1 day
 		g('set xtic '+tic)
 		g('set xlabel "Date (UTC)"')
 		g('set autoscale x')
 
 		# tic width 4 GiB
-		g('set ytic 4')
-		g('set ylabel "Traffic per run (GiB)"')
+		g('set ytic 8')
+		g('set ylabel "Traffic (GiB)"')
 		g('set yrange [0:]')
 
 		g('set key center bottom outside horizontal')
