@@ -42,7 +42,7 @@ def plot():
 			end = datetime.date(datetime.datetime.today().year, datetime.datetime.today().month+1, 1)-datetime.timedelta(1) # end
 			tic = str(60*60*24*2)
 		
-		title = title+" as per "+datetime.datetime.today().strftime("%d.%m.%Y, %H:%M")
+		title = title+" as per "+datetime.datetime.today().strftime("%d.%m.%Y, %H:%M")+" UTC"
 		print("Begin: "+str(begin))
 		print("End: "+str(end))
 		con = sql.connect(getPathToDB())
