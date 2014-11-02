@@ -8,7 +8,6 @@ averages = []
 print(datetime.datetime.utcnow())
 averages.append(datetime.datetime.utcnow().strftime("%s"))
 for avg in str(loadAverages).rstrip().split(", "):
-	avg = avg.replace(",", ".")
 	averages.append(avg)
 #print(averages)
 
