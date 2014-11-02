@@ -1,5 +1,5 @@
 set term png truecolor size 700,400 font "Helvetica, 13pt" 
-set title "CPU-Load as of: ". system("date +'%H:%M:%S'") 
+set title "CPU-Load as of ". system("date +'%H:%M:%S'")." on ".system("uname -n")
 set grid xtics
 set grid ytics
 set output "cpu.png"
