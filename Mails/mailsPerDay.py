@@ -8,6 +8,7 @@ from datetime import timedelta
 import Gnuplot
 import ConfigParser
 import sys
+import calendar
 
 def login():
 	config = ConfigParser.ConfigParser()
@@ -62,7 +63,7 @@ def plot(data):
 	g('set title "Mails Received And Sent In '+data[0][0].strftime('%B %Y')+'"')
 	g('set grid')
 	g('set grid mxtics')
-	filename = "mailsPerDay_" + str(data[0][0].month) + str(data[0][0].year)+ ".png"
+	filename = "mailsPerDay_" + str(data[0][0].strftime('%Y_%m'))+ ".png"
 	g('set output "'+filename+'"')
 
 	g('set xdata time')
@@ -70,8 +71,8 @@ def plot(data):
 	# parse timestamp
 	g('set timefmt "%s"')
 
-	# set ad day-month
-	g('set format x "%d.%m."')
+	# set format as day.
+	g('set format x "%d."')
 
 	# tic with 1 day
 	g('set xtic '+str(60*60*24*1))
@@ -82,11 +83,6 @@ def plot(data):
 	g('set ylabel "# of Mails"')
 	g('set yrange [0:]')
 
-	#g('set y2tic 4')
-	#g('set autoscale y2')
-	#g('set y2label "Received Mails"')
-	#g('set y2range [0:]')
-
 	g('set key center bottom outside horizontal')
 
 	g('set style fill solid 1.0')
@@ -96,26 +92,46 @@ def plot(data):
 	for elem in data:
 		formatted.append([elem[1], elem[2], elem[3]])
 
+	# offset blocks by 5 hours in each direction
 	plot1 = Gnuplot.PlotItems.Data(formatted, using="($1-60*60*5):($2):(60*60*8)", title="Sent")
 	plot2 = Gnuplot.PlotItems.Data(formatted, using="($1+60*60*5):($3):(60*60*8)", title="Received")
 
 	g.plot(plot1, plot2)
+	print filename+" produced."
 
 
 if __name__ == '__main__':
 	# read params
-	if len(sys.argv) > 1 or len(sys.argv) < 1:
+	if len(sys.argv) > 3 or len(sys.argv) < 1:
 		print "Usage: python mailsPerDay.py"
+		print "              mailsPerDay.py month"
+		print "              mailsPerDay.py month year"
 		exit()
 	login();
 	data = []
-	for day in range(1, date.today().day):
-	#for day in range(1, 4):
-		currentDate = datetime.date(date.today().year, date.today().month, day)
 
-		sentNum = countSent(currentDate);
-		receivedNum = countReceived(currentDate);
+	dateRange = [];
+	if len(sys.argv) == 1:
+		for day in range(1, date.today().day+1):
+			dateRange.append(datetime.date(date.today().year, date.today().month, day))
+	elif len(sys.argv) == 2:
+		month = int(sys.argv[1])
+		lastOfMonth = calendar.monthrange(date.today().year,month)[1]
+		for day in range(1, lastOfMonth+1):
+			dateRange.append(datetime.date(date.today().year, month, day))
+	elif len(sys.argv) == 3:
+		month = int(sys.argv[1])
+		year = int(sys.argv[2])
+		for day in range(1, calendar.monthrange(year,month)[1]+1):
+			dateRange.append(datetime.date(year, month, day))
+	print dateRange
 
-		data.append([currentDate, currentDate.strftime("%s"), sentNum, receivedNum])
+	# cycle trough given dates
+	for day in dateRange:
+
+		sentNum = countSent(day);
+		receivedNum = countReceived(day);
+
+		data.append([day, day.strftime("%s"), sentNum, receivedNum])
 
 	plot(data)
