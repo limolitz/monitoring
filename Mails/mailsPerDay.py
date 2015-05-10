@@ -7,6 +7,7 @@ from datetime import date
 from datetime import timedelta
 import Gnuplot
 import ConfigParser
+import sys
 
 def login():
 	config = ConfigParser.ConfigParser()
