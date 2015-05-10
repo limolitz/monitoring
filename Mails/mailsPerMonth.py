@@ -8,6 +8,8 @@ from datetime import date
 from datetime import timedelta
 import Gnuplot
 import ConfigParser
+import pickle
+import sys
 
 def login():
 	config = ConfigParser.ConfigParser()
@@ -64,10 +66,10 @@ def countReceived(firstOfMonth):
 def plot(data):
 	g = Gnuplot.Gnuplot(persist=1)
 	g('set term png truecolor size 1000,500 font "Helvetica, 13pt" ')
-	g('set title "Mails Received And Sent In '+data[0][0].strftime('%Y')+'"')
+	g('set title "Mails Received And Sent From '+data[0][0].strftime('%Y')+' to 2015"')
 	g('set grid')
 	g('set grid mxtics')
-	filename = "mails_" + str(data[0][0].year)+ ".png"
+	filename = "mailsPerMonth_" + str(data[0][0].year)+ ".png"
 	g('set output "'+filename+'"')
 
 	# set input data as time
@@ -109,21 +111,40 @@ def plot(data):
 	plot2 = Gnuplot.PlotItems.Data(formatted, using="($1+60*60*24*6):($3+$4+$5):(60*60*24*12)", title="Received, deleted")
 	plot3 = Gnuplot.PlotItems.Data(formatted, using="($1+60*60*24*6):($3+$4):(60*60*24*12)", title="Received, Inbox")
 	plot4 = Gnuplot.PlotItems.Data(formatted, using="($1+60*60*24*6):($3):(60*60*24*12)", title="Received, archived")
-
-	g.plot(plot1, plot2, plot3, plot4)
+	plot5 = Gnuplot.PlotItems.Data(formatted, using="($1):($3+$4) smooth bezier", title="Received, smoothed")
+	plot6 = Gnuplot.PlotItems.Data(formatted, using="($1):($2) smooth bezier", title="Sent, smoothed")
+	
+	g.plot(plot1, plot2, plot3, plot4, plot5, plot6)
+	print filename+" produced."
 
 
 if __name__ == '__main__':
+	if len(sys.argv) > 2 or len(sys.argv) < 1:
+		print "Usage: python mailsPerDay.py"
+		print "              mailsPerDay.py startYear"
+		exit()
 	login();
 	data = []
-	#for month in range(1, date.today().month+1):
-	for month in range(1, 13):	
-		#firstOfMonth = datetime.date(date.today().year, month, 1)
-		firstOfMonth = datetime.date(2014, month, 1)
 
+	dateRange = [];
+	# plot current year
+	if len(sys.argv) == 1:
+		for month in range(1, date.today().month+1):
+			dateRange.append(datetime.date(date.today().year, month, 1))
+	# plot from startYear to current year
+	elif len(sys.argv) == 2:
+		startYear = int(sys.argv[1])
+		for year in range(startYear,date.today().year+1):
+			if year == date.today().year:
+				for month in range(1, date.today().month+1):
+					dateRange.append(datetime.date(year, month, 1))
+			else:
+				for month in range(1, 13):
+					dateRange.append(datetime.date(year, month, 1))
+
+	for firstOfMonth in dateRange:
 		sentNum = countSent(firstOfMonth);
 		receivedNum = countReceived(firstOfMonth);
 
 		data.append([firstOfMonth, firstOfMonth.strftime("%s"), sentNum, receivedNum])
-
 	plot(data)
