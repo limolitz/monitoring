@@ -16,9 +16,9 @@ def plot():
 		# plot current month per default
 		# read params
 		if len(sys.argv) > 3 or len(sys.argv) < 1:
-			print "Usage: python bankClient.py beginTimeStamp endTimestamp"
-			print "              bankClient.py lastNDays"
-			print "              bankClient.py"
+			print "Usage: python plot.py beginTimeStamp endTimestamp"
+			print "              plot.py lastNDays"
+			print "              plot.py"
 			exit()
 		#else:
 		#	print(len(sys.argv))
@@ -29,7 +29,7 @@ def plot():
 		if len(sys.argv) == 3:
 			begin = datetime.datetime.fromtimestamp(int(sys.argv[1])) # start
 			end = datetime.datetime.fromtimestamp(int(sys.argv[2])) # end
-			tic=str(60*60*24*0.02)
+			tic=str(60*60*24*30)
 		elif len(sys.argv) == 2:
 			begin = datetime.datetime.today()-datetime.timedelta(days=int(sys.argv[1]))
 			end = datetime.datetime.today() # end
@@ -95,7 +95,7 @@ def plot():
 		g('set autoscale x')
 
 		# tic width 4 GiB
-		g('set ytic 8')
+		g('set ytic 4')
 		g('set ylabel "Traffic (GiB)"')
 		g('set yrange [0:]')
 
