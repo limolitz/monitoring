@@ -105,7 +105,7 @@ def plot(data):
 if __name__ == '__main__':
 	# read params
 	if len(sys.argv) > 1 or len(sys.argv) < 1:
-		print "Usage: python mails.py"
+		print "Usage: python mailsPerDay.py"
 		exit()
 	login();
 	data = []
