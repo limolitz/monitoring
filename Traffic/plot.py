@@ -25,7 +25,6 @@ def plot():
 		
 		tic = ""
 		title = "Traffic"
-		machineName = subprocess.Popen('uname -n', stdout=subprocess.PIPE, shell=True).stdout.read().strip()
 		if len(sys.argv) == 3:
 			begin = datetime.datetime.fromtimestamp(int(sys.argv[1])) # start
 			end = datetime.datetime.fromtimestamp(int(sys.argv[2])) # end
@@ -75,10 +74,10 @@ def plot():
 			counter += data[index][1]+data[index][2];
 			overallTraffic.append((data[index][0]+data[index][3]/2, counter));
 
-		g = Gnuplot.Gnuplot(persist=1)
+		g = Gnuplot.Gnuplot()
 		g('set term png truecolor size 700,400 font "Helvetica, 13pt" ')
 		g('set output "traffic.png"')
-		g('set title "'+title+' on '+machineName+'"')
+		g('set title "'+title+' on ".system("uname -n")')
 		g('set grid')
 		g('set grid mxtics')
 		g('set style data boxes')
@@ -90,6 +89,7 @@ def plot():
 		# set ad day-month
 		g('set format x "%d.%m."')		
 		# tic with 1 day
+		#print('Tic: '+tic)
 		g('set xtic '+tic)
 		g('set xlabel "Date (UTC)"')
 		g('set autoscale x')
