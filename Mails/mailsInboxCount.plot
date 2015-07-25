@@ -12,7 +12,7 @@ set timefmt "%s"
 set format x "%d.%m."
 
 # tic with 1 day
-set xtic 86400
+set xtic 86400*14
 set xlabel "Date"
 set autoscale x
 
@@ -29,4 +29,4 @@ set key center bottom outside horizontal
 set style fill solid 1.0
 set style data boxes	
 
-plot "inbox.data" using 1:2 title "# Inbox" with lines lc rgb 'blue', "inbox.data" using 1:3 title "# Uni" with lines lc rgb 'green', "inbox.data" using 1:($4/(60*60*30)) title "Avg. Age of Inbox Mails" axes x1y2 with lines lt 3, "inbox.data" using 1:($5/(60*60*30)) title "Avg. Age of Uni Mails" axes x1y2 with lines lt 4
+plot "inbox.data" using 1:2 title "# Inbox" with lines lc rgb 'blue', "inbox.data" using 1:3 title "# Uni" with lines lc rgb 'green' #, "inbox.data" using 1:($4/(60*60*30)) title "Avg. Age of Inbox Mails" axes x1y2 with lines lt 3, "inbox.data" using 1:($5/(60*60*30)) title "Avg. Age of Uni Mails" axes x1y2 with lines lt 4
