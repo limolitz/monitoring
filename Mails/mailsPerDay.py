@@ -38,10 +38,10 @@ def countSent(day):
 
 def countReceived(day):
 	global imap
-	imap.select('Archive', True);
 	today = day.strftime('%d-%b-%Y');
 	tomorrow = (day + timedelta(days=+1)).strftime('%d-%b-%Y');
 
+	imap.select('Archive', True);
 	search = imap.search(None, "BEFORE", tomorrow, "SINCE", today);
 	receivedArchive = len(search[1][0].split(" "));
 
@@ -49,11 +49,15 @@ def countReceived(day):
 	search = imap.search(None, "BEFORE", tomorrow, "SINCE", today);
 	receivedInbox = len(search[1][0].split(" "));
 
+	imap.select('Uni', True);
+	search = imap.search(None, "BEFORE", tomorrow, "SINCE", today);
+	receivedUni = len(search[1][0].split(" "));
+
 	imap.select('Trash', True);
 	search = imap.search(None, "BEFORE", tomorrow, "SINCE", today);
 	receivedTrash = len(search[1][0].split(" "));
 
-	receivedMails = receivedArchive + receivedInbox + receivedTrash;
+	receivedMails = receivedArchive + receivedInbox + receivedUni + receivedTrash;
 
 	return receivedMails
 
