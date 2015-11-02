@@ -33,12 +33,13 @@ def plot():
 			begin = datetime.datetime.today()-datetime.timedelta(days=int(sys.argv[1]))
 			end = datetime.datetime.today() # end
 			# tic
-			tic=str(60*60*24*2)
+			tic=str(60*60*24*1)
 			title = "Traffic last "+sys.argv[1]+" days"
 		else:
-			title = "Traffic this month"
 			begin = datetime.date(datetime.datetime.today().year, datetime.datetime.today().month, 1)
 			end = datetime.date(datetime.datetime.today().year, datetime.datetime.today().month+1, 1)-datetime.timedelta(1) # end
+			title = "Traffic this month"
+			print "Traffic this month, from ",begin,begin.strftime("%s"),"to",end,end.strftime("%s");
 			tic = str(60*60*24*2)
 		
 		title = title+" as per "+datetime.datetime.today().strftime("%d.%m.%Y, %H:%M")+" UTC"
@@ -53,6 +54,7 @@ def plot():
 		adjustedData = []
 		lastTX = 0;
 		lastRX = 0;
+		dateTmp = 0;
 		dataFile = open("traffic.data", "w")
 		for date in data:
 			adjustedDate = []
@@ -61,7 +63,13 @@ def plot():
 			adjustedDate.append(lastRX)
 			lastTX = date[2]+lastTX
 			adjustedDate.append(lastTX)
-			adjustedDate.append(date[3])
+			if date[0]-dateTmp-date[3]>2 and dateTmp!=0:
+				print "Check",datetime.datetime.fromtimestamp(date[0]),date[0], "because uptime is", date[3],"while difference is",date[0]-dateTmp;
+				dateTmp = date[0]-dateTmp
+			else:
+				dateTmp = date[3]
+			adjustedDate.append(dateTmp)
+			dateTmp = date[0];
 			adjustedData.append(adjustedDate)
 			dataFile.write(str(date[0])+"	"+str(lastRX)+"	"+str(lastTX)+"	"+str(date[3])+"\n")
 		dataFile.close()
