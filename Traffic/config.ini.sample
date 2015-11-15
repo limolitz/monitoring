@@ -1,0 +1,7 @@
+[Account]
+server = example.com
+port = 993
+user = user@example
+password = hunter2
+interface = eth0
+cacrtPath = ./ca.crt
