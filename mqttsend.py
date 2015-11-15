@@ -22,7 +22,7 @@ def sendMQTT(topic, data):
 	client.tls_set(config.get("Account", "cacrtPath"), tls_version=ssl.PROTOCOL_TLSv1_2)
 	client.connect(hostname, port, 60)
 
-	uname = subprocess.Popen('uname -n', stdout=subprocess.PIPE, shell=True).stdout.read()
+	uname = subprocess.Popen('uname -n', stdout=subprocess.PIPE, shell=True).stdout.read().strip()
 
 	# Publish a message
 	client.publish(topic+"/"+username+"/"+uname, json.dumps(data))
