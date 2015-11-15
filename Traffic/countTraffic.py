@@ -2,6 +2,9 @@
 import subprocess
 import sqlite3 as sql
 import datetime
+import sys
+sys.path.insert(0,'..')
+import mqttsend
 
 def getPathToDB():
 	return '/home/florin/bin/QuantifiedSelf/Traffic/traffic.db'
@@ -17,14 +20,12 @@ def uptimeInSeconds():
 	print 'Uptime: ',uptime, 's'
 	return uptime
 
-def saveToDatabase():
+def saveToDatabase(uptime, traffic):
 	con = None;
 	try:
 		con = sql.connect(getPathToDB());
 		cur = con.cursor();
-		uptime = uptimeInSeconds();
-		traffic = trafficInBytes();
-		print 'Recevied bytes:',traffic[0],', Transmitted bytes:',traffic[1];
+		print 'Received bytes:',traffic[0],', Transmitted bytes:',traffic[1];
 		# get last entry
 		cur.execute('SELECT * FROM traffic WHERE date = (SELECT MAX(date) FROM traffic)');
 		data = cur.fetchone()
@@ -42,12 +43,12 @@ def saveToDatabase():
 			if diffTraffic0 < 0:
 				print('Set trafficRX to 0 because it was '+diffTraffic0);
 				diffTraffic0 = 0;
-			
+
 			diffTraffic1 = int(traffic[1])-int(data[5])
 			if diffTraffic1 < 0:
 				print('Set trafficTX to 0 because it was '+diffTraffic1);
 				diffTraffic1 = 0;
-			
+
 			diffUptime = int(datetime.datetime.utcnow().strftime("%s"))-int(data[0])
 			print("Make new entry with RX "+str(diffTraffic0)+", TX "+str(diffTraffic1)+" and diffUptime "+str(diffUptime)+".")
 			cur.execute("INSERT INTO traffic VALUES (?,?,?,?,?,?)", (datetime.datetime.utcnow().strftime("%s"), diffTraffic0, diffTraffic1, diffUptime, traffic[0], traffic[1]));
@@ -61,6 +62,13 @@ def saveToDatabase():
 		if con:
 			con.close()
 
-
 if __name__ == '__main__':
-	saveToDatabase()
+	uptime = uptimeInSeconds();
+	traffic = trafficInBytes();
+	saveToDatabase(uptime, traffic);
+	data = {}
+	data["timestamp"] = datetime.datetime.utcnow().strftime("%s")
+	data["uptime"] = uptime
+	data["trafficReceived"] = traffic[0]
+	data["trafficTransmitted"] = traffic[1]
+	mqttsend.sendMQTT("traffic", data);
