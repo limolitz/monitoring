@@ -9,8 +9,6 @@ import datetime
 import configparser
 import email
 import email.header
-from statistics import mean
-
 
 def login():
 	config = configparser.ConfigParser()
@@ -57,7 +55,7 @@ def getDataForToday():
 	uniCount, uniTimestamps = countFolder('Uni');
 	#print (inboxTimestamps, mean(inboxTimestamps), );
 	
-	return (str(inboxCount), str(uniCount), int(datetime.datetime.utcnow().strftime("%s"))-mean(inboxTimestamps), int(datetime.datetime.utcnow().strftime("%s"))-mean(uniTimestamps));
+	return (str(inboxCount), str(uniCount), int(datetime.datetime.utcnow().strftime("%s"))-(sum(inboxTimestamps) / float(len(inboxTimestamps))), int(datetime.datetime.utcnow().strftime("%s"))-(sum(uniTimestamps) / float(len(uniTimestamps))));
 
 def storeData():
 	data = getDataForToday();
