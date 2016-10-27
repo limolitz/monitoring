@@ -48,10 +48,8 @@ def countFolder(folder):
 
 def getDataForToday():
 	inboxCount, inboxTimestamps = countFolder('INBOX');
-	uniCount, uniTimestamps = countFolder('Uni');
-	#print (inboxTimestamps, mean(inboxTimestamps), );
 
-	return (str(inboxCount), str(uniCount), int(datetime.datetime.utcnow().strftime("%s"))-(sum(inboxTimestamps) / float(len(inboxTimestamps))), int(datetime.datetime.utcnow().strftime("%s"))-(sum(uniTimestamps) / float(len(uniTimestamps))));
+	return (str(inboxCount), '0', int(datetime.datetime.utcnow().strftime("%s"))-(sum(inboxTimestamps) / float(len(inboxTimestamps))), 0);
 
 def storeData():
 	data = getDataForToday();
@@ -71,7 +69,6 @@ def getData():
 	return data;
 
 if __name__ == '__main__':
-	login();
-	storeData();
-	getDataForToday();
-	#plot(getData());
+	login()
+	storeData()
+	#plot(getData())
