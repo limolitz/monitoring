@@ -1,88 +1,90 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # log traffic on unix
 import subprocess
 import sqlite3 as sql
 import datetime
 import sys
 sys.path.insert(0,'..')
-import ConfigParser
+import configparser
 import json
 
 def getPathToDB(selfPath):
-	return "{}/traffic.db".format(selfPath);
+	return "{}/traffic.db".format(selfPath)
 
 def trafficInBytes(selfPath):
-	bytes = subprocess.Popen("{}/callIfconfig.sh".format(selfPath), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True).stdout.read().split();
-	return bytes;
+	bytes = subprocess.Popen("{}/callIfconfig.sh".format(selfPath), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True).stdout.read().split()
+	return bytes
 
 def uptimeInSeconds(selfPath):
 	# get uptime in seconds
 	uptime = int(subprocess.Popen("{}/getUptimeSeconds.sh".format(selfPath), stdout=subprocess.PIPE).stdout.read())
-	print 'Uptime: ',uptime, 's'
+	print('Uptime: {}s'.format(uptime))
 	return uptime
 
 def saveToDatabase(uptime, traffic, selfPath):
-	con = None;
+	con = None
 	try:
-		con = sql.connect(getPathToDB(selfPath));
-		cur = con.cursor();
-		print 'Received bytes:',traffic[0],', Transmitted bytes:',traffic[1];
+		con = sql.connect(getPathToDB(selfPath))
+		cur = con.cursor()
+		receivedBytesOld=int(traffic[0])
+		transmittedBytesOld=int(traffic[1])
+		print('Received bytes: {}, Transmitted bytes: {}'.format(receivedBytesOld,transmittedBytesOld))
 		# get last entry
-		cur.execute('SELECT * FROM traffic WHERE date = (SELECT MAX(date) FROM traffic)');
+		cur.execute('SELECT * FROM traffic WHERE date = (SELECT MAX(date) FROM traffic)')
 		data = cur.fetchone()
-		print(data)
+		print("Old data: {}".format(data))
 
 		if not data is None:
-			print "Last entry from date ",datetime.datetime.fromtimestamp(data[0]),", total uptime ",uptime," vs. ",data[3];
+			print("Last entry from date {}, total uptime {} vs . {}.".format(datetime.datetime.fromtimestamp(data[0]),uptime,data[3]))
 		# no entry found or traffic is smaller than on last record, make new entry
-		if data is None or int(traffic[0])<int(data[4]):
-			print 'New entry made.';
+		if data is None or int(receivedBytesOld)<int(data[4]):
+			print('New entry made.')
 			#emtpy database
 			if data is None:
-				cur.execute("INSERT INTO traffic VALUES (?,?,?,?,?,?)", (datetime.datetime.utcnow().strftime("%s"), traffic[0], traffic[1], uptime, traffic[0], traffic[1]));
+				cur.execute("INSERT INTO traffic VALUES (?,?,?,?,?,?)", (datetime.datetime.utcnow().strftime("%s"), receivedBytesOld, transmittedBytesOld, uptime, receivedBytesOld, transmittedBytesOld))
 			#rollover
-			elif int(traffic[0])<int(data[4]):
-				print "Rollover";
+			elif int(receivedBytesOld)<int(data[4]):
+				print("Rollover")
 				diffUptime = int(datetime.datetime.utcnow().strftime("%s"))-int(data[0])
-				cur.execute("INSERT INTO traffic VALUES (?,?,?,?,?,?)", (datetime.datetime.utcnow().strftime("%s"), traffic[0], traffic[1], diffUptime, traffic[0], traffic[1]));
+				cur.execute("INSERT INTO traffic VALUES (?,?,?,?,?,?)", (datetime.datetime.utcnow().strftime("%s"), receivedBytesOld, transmittedBytesOld, diffUptime, receivedBytesOld, transmittedBytesOld))
 		# if greater => same computer run and no overflow, calculate difference and make new record
 		else:
-			diffTraffic0 = int(traffic[0])-int(data[4])
+			diffTraffic0 = int(receivedBytesOld)-int(data[4])
 			if diffTraffic0 < 0:
-				print('Set trafficRX to 0 because it was '+str(diffTraffic0));
-				diffTraffic0 = 0;
+				print('Set trafficRX to 0 because it was '+str(diffTraffic0))
+				diffTraffic0 = 0
 
-			diffTraffic1 = int(traffic[1])-int(data[5])
+			diffTraffic1 = int(transmittedBytesOld)-int(data[5])
 			if diffTraffic1 < 0:
-				print('Set trafficTX to 0 because it was '+str(diffTraffic1));
-				diffTraffic1 = 0;
+				print('Set trafficTX to 0 because it was '+str(diffTraffic1))
+				diffTraffic1 = 0
 
 			diffUptime = int(datetime.datetime.utcnow().strftime("%s"))-int(data[0])
-			print "Make new entry with diff RX", diffTraffic0,", total RX", traffic[0],", diff TX", diffTraffic1,", total TX", traffic[1], " and diffUptime", diffUptime, "."
-			cur.execute("INSERT INTO traffic VALUES (?,?,?,?,?,?)", (datetime.datetime.utcnow().strftime("%s"), diffTraffic0, diffTraffic1, diffUptime, traffic[0], traffic[1]));
-		con.commit();
+			print("Make new entry with diff RX {}, total RX {}, diff TX {}, total TX {} and diffUptime {}.".format(diffTraffic0,receivedBytesOld,diffTraffic1,transmittedBytesOld,diffUptime))
+			cur.execute("INSERT INTO traffic VALUES (?,?,?,?,?,?)", (datetime.datetime.utcnow().strftime("%s"), diffTraffic0, diffTraffic1, diffUptime, receivedBytesOld, transmittedBytesOld))
+		con.commit()
 
-	except sql.Error, e:
-		print "Error %s:" % e.args[0];
+	except sql.Error as e:
+		print("Error {}.".format(e.args[0]))
 
 	finally:
 		if con:
-			con.close();
+			con.close()
 
 if __name__ == '__main__':
-	config = ConfigParser.ConfigParser()
+	config = configparser.ConfigParser()
 	config.read('config.ini')
 	selfPath = config.get("Paths", "selfPath")
 
-	uptime = uptimeInSeconds(selfPath);
-	traffic = trafficInBytes(selfPath);
-	saveToDatabase(uptime, traffic,selfPath);
+	uptime = uptimeInSeconds(selfPath)
+	traffic = trafficInBytes(selfPath)
+	saveToDatabase(uptime, traffic, selfPath)
 	mqttObject = {
 		"topic": "traffic",
 		"measurements": {
 			"uptime": uptime,
-			"trafficReceived": traffic[0],
-			"trafficTransmitted": traffic[1]
+			"trafficReceived": int(traffic[0]),
+			"trafficTransmitted": int(traffic[1])
 		}
 	}
 	json = json.dumps(mqttObject)
