@@ -5,26 +5,26 @@ import sqlite3 as sql
 import datetime
 import sys
 sys.path.insert(0,'..')
-import mqttsend
+import ConfigParser
+import json
 
-def getPathToDB():
-	return '/home/florin/bin/QuantifiedSelf/Traffic/traffic.db';
+def getPathToDB(selfPath):
+	return "{}/traffic.db".format(selfPath);
 
-def trafficInBytes():
-	bytes = subprocess.Popen('/home/florin/bin/QuantifiedSelf/Traffic/callIfconfig.sh', stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True).stdout.read().split();
-	#print bytes
+def trafficInBytes(selfPath):
+	bytes = subprocess.Popen("{}/callIfconfig.sh".format(selfPath), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True).stdout.read().split();
 	return bytes;
 
-def uptimeInSeconds():
+def uptimeInSeconds(selfPath):
 	# get uptime in seconds
-	uptime = int(subprocess.Popen('/home/florin/bin/QuantifiedSelf/Traffic/getUptimeSeconds.sh', stdout=subprocess.PIPE).stdout.read())
+	uptime = int(subprocess.Popen("{}/getUptimeSeconds.sh".format(selfPath), stdout=subprocess.PIPE).stdout.read())
 	print 'Uptime: ',uptime, 's'
 	return uptime
 
-def saveToDatabase(uptime, traffic):
+def saveToDatabase(uptime, traffic, selfPath):
 	con = None;
 	try:
-		con = sql.connect(getPathToDB());
+		con = sql.connect(getPathToDB(selfPath));
 		cur = con.cursor();
 		print 'Received bytes:',traffic[0],', Transmitted bytes:',traffic[1];
 		# get last entry
@@ -70,12 +70,23 @@ def saveToDatabase(uptime, traffic):
 			con.close();
 
 if __name__ == '__main__':
-	uptime = uptimeInSeconds();
-	traffic = trafficInBytes();
-	saveToDatabase(uptime, traffic);
-	data = {}
-	data["timestamp"] = datetime.datetime.utcnow().strftime("%s")
-	data["uptime"] = uptime
-	data["trafficReceived"] = traffic[0]
-	data["trafficTransmitted"] = traffic[1]
-	mqttsend.sendMQTT("traffic", data);
+	config = ConfigParser.ConfigParser()
+	config.read('config.ini')
+	selfPath = config.get("Paths", "selfPath")
+
+	uptime = uptimeInSeconds(selfPath);
+	traffic = trafficInBytes(selfPath);
+	saveToDatabase(uptime, traffic,selfPath);
+	mqttObject = {
+		"topic": "traffic",
+		"measurements": {
+			"uptime": uptime,
+			"trafficReceived": traffic[0],
+			"trafficTransmitted": traffic[1]
+		}
+	}
+	json = json.dumps(mqttObject)
+	print("Writing JSON: {}".format(json))
+	sender = subprocess.Popen([config.get("Paths", "mqttPath")], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+	sender.stdin.write(json.encode('utf-8'))
+
