@@ -53,7 +53,7 @@ def readableNameMac(device,quiet=False):
 		return device['name']
 
 def formatTimedifference(timeDifference):
-	if timeDifference is datetime.timedelta:
+	if isinstance(timeDifference,datetime.timedelta):
 		seconds = timeDifference.total_seconds()
 		minutes = int(seconds / 60)
 		hours = 0
@@ -70,7 +70,7 @@ def formatTimedifference(timeDifference):
 		else:
 			return "{:02d}:{:02d}h".format(hours,minutes)
 	else:
-		debugPrint("Unknown object class: {}".format(timeDifference))
+		debugPrint("Unknown object class {}: {}".format(type(timeDifference),timeDifference))
 		return "NULL"
 
 def formatTime(time):
@@ -175,6 +175,7 @@ def loadDevicesFromRouter():
 	devicelist = 'http://192.168.0.1/basic/dhcp.asp'
 	loginPath = 'http://192.168.0.1/goform/login'
 	systemPath = 'http://192.168.0.1/status/system.asp'
+	logoutPath = 'http://192.168.0.1/logout.asp'
 
 	response = urllib.request.urlopen(devicelist)
 	html = response.read().decode('utf8')
@@ -227,9 +228,12 @@ def loadDevicesFromRouter():
 				expiresFormatted = None
 			clients.append({'name': name, 'network': etherOrWifi, 'mac': mac, 'ip': ip, 'expireTime': expiresFormatted})
 	debugPrint(clients)
+
+	# log out
+	response = urllib.request.urlopen(logoutPath)
+	html = response.read().decode('utf8')
+
 	return clients
-
-
 
 #print("Caller: {}, manual call? {}".format(findCaller(),getIfManualCall()))
 
@@ -316,4 +320,4 @@ for deviceMac in devices:
 		devices[deviceMac]['lastOffline'] = datetime.datetime.now()
 
 
-storeDevicelist(devices)
+#storeDevicelist(devices)
