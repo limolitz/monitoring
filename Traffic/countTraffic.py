@@ -11,8 +11,15 @@ import json
 def getPathToDB(selfPath):
 	return "{}/traffic.db".format(selfPath)
 
-def trafficInBytes(selfPath):
-	bytes = subprocess.Popen("{}/callIfconfig.sh".format(selfPath), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True).stdout.read().split()
+def trafficInBytes(selfPath,config):
+	bytes = []
+	interface = format(config.get("Paths", "interface"))
+	with open("/sys/class/net/{}/statistics/rx_bytes".format(interface), "rb") as f:
+		content = f.read()
+		bytes.append(int(content))
+	with open("/sys/class/net/{}/statistics/tx_bytes".format(interface), "rb") as f:
+		content = f.read()
+		bytes.append(int(content))
 	return bytes
 
 def uptimeInSeconds(selfPath):
@@ -77,7 +84,7 @@ if __name__ == '__main__':
 	selfPath = config.get("Paths", "selfPath")
 
 	uptime = uptimeInSeconds(selfPath)
-	traffic = trafficInBytes(selfPath)
+	traffic = trafficInBytes(selfPath,config)
 	saveToDatabase(uptime, traffic, selfPath)
 	mqttObject = {
 		"topic": "traffic",
@@ -91,4 +98,3 @@ if __name__ == '__main__':
 	print("Writing JSON: {}".format(json))
 	sender = subprocess.Popen([config.get("Paths", "mqttPath")], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
 	sender.stdin.write(json.encode('utf-8'))
-
