@@ -51,7 +51,9 @@ def saveToDatabase(uptime, traffic, selfPath):
 				cur.execute("INSERT INTO traffic VALUES (?,?,?,?,?,?)", (datetime.datetime.utcnow().strftime("%s"), receivedBytesOld, transmittedBytesOld, uptime, receivedBytesOld, transmittedBytesOld))
 			#rollover
 			elif int(receivedBytesOld)<int(data[4]):
-				print("Rollover")
+				# TODO: transmitted rollover
+				# TODO: find out difference between data[4] and the actual rollover number (which is probably 2^32)
+				print("Rollover: {} is < than {}".format(receivedBytesOld,data[4]))
 				diffUptime = int(datetime.datetime.utcnow().strftime("%s"))-int(data[0])
 				cur.execute("INSERT INTO traffic VALUES (?,?,?,?,?,?)", (datetime.datetime.utcnow().strftime("%s"), receivedBytesOld, transmittedBytesOld, diffUptime, receivedBytesOld, transmittedBytesOld))
 		# if greater => same computer run and no overflow, calculate difference and make new record
