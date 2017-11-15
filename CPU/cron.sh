@@ -1,3 +1,3 @@
 #!/bin/bash
-cd /home/florin/bin/QuantifiedSelf/CPU
+cd $(dirname "${BASH_SOURCE[0]}")
 TZ=UTC python loadAverages.py
