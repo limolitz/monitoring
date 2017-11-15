@@ -4,7 +4,7 @@ Or: I'm learning python.
 
 My Quantified Self scripts. Currently mainly focused on collecting data of my computer.
 
-Each folder consists of a script which logs its data to a database, a script to create the database and a script to plot the results.
+Each folder consists of a script which logs its data to a MQTT script you can find [here](https://github.com/wasmitnetzen/mqttsend).
 
 Currently working scripts:
 * Logging of currently opened tabs in Firefox (Linux only, currently unmaintained)
