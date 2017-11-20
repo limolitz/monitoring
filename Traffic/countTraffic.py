@@ -7,11 +7,15 @@ import sys
 sys.path.insert(0,'..')
 import configparser
 import json
-
-def getPathToDB(selfPath):
-	return "{}/traffic.db".format(selfPath)
+import platform
 
 def trafficInBytes(selfPath,config):
+	if platform.system() == "Darwin":
+		return trafficInBytesMac(selfPath,config)
+	else:
+		return trafficInBytesLinux(selfPath,config)
+
+def trafficInBytesLinux(selfPath,config):
 	bytes = []
 	interface = format(config.get("Paths", "interface"))
 	with open("/sys/class/net/{}/statistics/rx_bytes".format(interface), "rb") as f:
@@ -22,63 +26,23 @@ def trafficInBytes(selfPath,config):
 		bytes.append(int(content))
 	return bytes
 
+def trafficInBytesMac(selfPath,config):
+	netstat = subprocess.Popen(["netstat","-b","-n","-I",config.get("Paths", "interface")],stdout=subprocess.PIPE)
+	output, errors = netstat.communicate()
+	# split by newlines
+	lines = output.decode("utf-8").split('\n')
+	# remove empty entries
+	parts = list(filter(None, lines[1].split(" ")))
+	ibytes = parts[6]
+	obytes = parts[9]
+	bytes = [ibytes,obytes]
+	return bytes
+
 def uptimeInSeconds(selfPath):
 	# get uptime in seconds
 	uptime = int(subprocess.Popen("{}/getUptimeSeconds.sh".format(selfPath), stdout=subprocess.PIPE).stdout.read())
 	print('Uptime: {}s'.format(uptime))
 	return uptime
-
-def saveToDatabase(uptime, traffic, selfPath):
-	con = None
-	try:
-		con = sql.connect(getPathToDB(selfPath))
-		cur = con.cursor()
-		receivedBytesOld=int(traffic[0])
-		transmittedBytesOld=int(traffic[1])
-		print('Received bytes: {}, Transmitted bytes: {}'.format(receivedBytesOld,transmittedBytesOld))
-		# get last entry
-		cur.execute('SELECT * FROM traffic WHERE date = (SELECT MAX(date) FROM traffic)')
-		data = cur.fetchone()
-		print("Old data: {}".format(data))
-
-		if not data is None:
-			print("Last entry from date {}, total uptime {} vs . {}.".format(datetime.datetime.fromtimestamp(data[0]),uptime,data[3]))
-		# no entry found or traffic is smaller than on last record, make new entry
-		if data is None or int(receivedBytesOld)<int(data[4]):
-			print('New entry made.')
-			#emtpy database
-			if data is None:
-				cur.execute("INSERT INTO traffic VALUES (?,?,?,?,?,?)", (datetime.datetime.utcnow().strftime("%s"), receivedBytesOld, transmittedBytesOld, uptime, receivedBytesOld, transmittedBytesOld))
-			#rollover
-			elif int(receivedBytesOld)<int(data[4]):
-				# TODO: transmitted rollover
-				# TODO: find out difference between data[4] and the actual rollover number (which is probably 2^32)
-				print("Rollover: {} is < than {}".format(receivedBytesOld,data[4]))
-				diffUptime = int(datetime.datetime.utcnow().strftime("%s"))-int(data[0])
-				cur.execute("INSERT INTO traffic VALUES (?,?,?,?,?,?)", (datetime.datetime.utcnow().strftime("%s"), receivedBytesOld, transmittedBytesOld, diffUptime, receivedBytesOld, transmittedBytesOld))
-		# if greater => same computer run and no overflow, calculate difference and make new record
-		else:
-			diffTraffic0 = int(receivedBytesOld)-int(data[4])
-			if diffTraffic0 < 0:
-				print('Set trafficRX to 0 because it was '+str(diffTraffic0))
-				diffTraffic0 = 0
-
-			diffTraffic1 = int(transmittedBytesOld)-int(data[5])
-			if diffTraffic1 < 0:
-				print('Set trafficTX to 0 because it was '+str(diffTraffic1))
-				diffTraffic1 = 0
-
-			diffUptime = int(datetime.datetime.utcnow().strftime("%s"))-int(data[0])
-			print("Make new entry with diff RX {}, total RX {}, diff TX {}, total TX {} and diffUptime {}.".format(diffTraffic0,receivedBytesOld,diffTraffic1,transmittedBytesOld,diffUptime))
-			cur.execute("INSERT INTO traffic VALUES (?,?,?,?,?,?)", (datetime.datetime.utcnow().strftime("%s"), diffTraffic0, diffTraffic1, diffUptime, receivedBytesOld, transmittedBytesOld))
-		con.commit()
-
-	except sql.Error as e:
-		print("Error {}.".format(e.args[0]))
-
-	finally:
-		if con:
-			con.close()
 
 if __name__ == '__main__':
 	config = configparser.ConfigParser()
@@ -87,7 +51,6 @@ if __name__ == '__main__':
 
 	uptime = uptimeInSeconds(selfPath)
 	traffic = trafficInBytes(selfPath,config)
-	saveToDatabase(uptime, traffic, selfPath)
 	mqttObject = {
 		"topic": "traffic",
 		"measurements": {
@@ -99,4 +62,5 @@ if __name__ == '__main__':
 	json = json.dumps(mqttObject)
 	print("Writing JSON: {}".format(json))
 	sender = subprocess.Popen([config.get("Paths", "mqttPath")], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
-	sender.stdin.write(json.encode('utf-8'))
+	output, errors = sender.communicate(json.encode("utf-8"))
+	print(output.decode("utf-8"),errors.decode("utf-8"))
