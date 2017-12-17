@@ -22,4 +22,5 @@ mqttObject = {
 json = json.dumps(mqttObject)
 print("Writing JSON: {}".format(json))
 sender = subprocess.Popen(["/home/florin/bin/mqttsend/mqttsend.sh"], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
-sender.stdin.write(json)
+output, errors = sender.communicate(json)
+print(output,errors)
