@@ -40,4 +40,5 @@ mqttObject = {
 json = json.dumps(mqttObject)
 print("Writing JSON: {}".format(json))
 sender = subprocess.Popen([config.get("Paths", "mqttPath")], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
-sender.stdin.write(json.encode('utf-8'))
+output, errors = sender.communicate(json.encode("utf-8"))
+print(output,errors)
