@@ -1,3 +1,3 @@
 #!/bin/bash
-cd /home/florin/bin/QuantifiedSelf/Traffic
+cd $(dirname "${BASH_SOURCE[0]}")
 TZ=UTC ./countTraffic.py

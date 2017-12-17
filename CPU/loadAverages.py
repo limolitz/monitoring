@@ -2,11 +2,16 @@
 import subprocess
 import datetime
 import json
+import configparser
+
+config = configparser.ConfigParser()
+config.read('config.ini')
 
 # read new data
-loadAverages = subprocess.Popen('/home/florin/bin/QuantifiedSelf/CPU/loadAverages.sh', stdout=subprocess.PIPE).stdout.read()
+loadAveragesProcess = subprocess.Popen('./loadAverages.sh', stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+loadAverages, errors = loadAveragesProcess.communicate()
 averages = []
-for avg in str(loadAverages).rstrip().split(", "):
+for avg in loadAverages.decode("utf-8").rstrip().split(", "):
 	averages.append(avg)
 
 # write object for MQTT sending
@@ -21,6 +26,6 @@ mqttObject = {
 
 json = json.dumps(mqttObject)
 print("Writing JSON: {}".format(json))
-sender = subprocess.Popen(["/home/florin/bin/mqttsend/mqttsend.sh"], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
-output, errors = sender.communicate(json)
-print(output,errors)
+sender = subprocess.Popen([config.get("Paths", "mqttPath")], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+output, errors = sender.communicate(json.encode("utf-8"))
+print(output.decode("utf-8"),errors.decode("utf-8"))
