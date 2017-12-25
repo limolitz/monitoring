@@ -1,0 +1,5 @@
+[disks]
+watchedFilesystems=/dev/root,/dev/sda1
+
+[Paths]
+mqttPath = ~/bin/mqttsend/mqttsend.sh
