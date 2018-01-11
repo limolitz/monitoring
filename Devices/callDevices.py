@@ -10,6 +10,7 @@ import time
 import subprocess
 import psutil
 from bs4 import BeautifulSoup
+import configparser
 
 def findCaller():
 	me = psutil.Process()
@@ -43,10 +44,12 @@ def readableNameOf(device,quiet=False):
 		return device['name']
 
 def readableNameMac(mac):
-	readableNames = {'84:8E:DF:54:40:13': 'z1compact', '00:71:CC:41:0B:D1': 'Hanna Laptop', 'F8:CF:C5:4F:FA:DA': 'Moto E', 'B8:27:EB:4A:D9:5E': 'frost', 'E8:2A:EA:27:48:C7': 'moneypenny', 'BC:6E:64:3D:4C:BA': 'Tablet', '6C:AD:F8:44:09:B3': 'Fairphone', '58:48:22:7E:3B:1B': 'Z5 Compact', 'C4:B3:01:D5:CD:F7': 'LS Retail Macbook', 'F0:79:60:B4:CE:BD': 'Matthias iPhone', '0C:3E:9F:58:5E:DF': 'Ellis iPhone', '08:74:02:13:43:BF': 'Renatas iPhone', '50:1A:C5:F5:76:23': 'Mathias Surface', '00:0C:29:37:6F:34': 'LS Retail VM Ubuntu', '24:7F:3C:06:57:D9': 'Annejet Android', '74:DE:2B:9D:46:B0': 'Annejet Laptop', '5C:F7:C3:C0:31:64': 'Franzi Android', '74:C2:46:F7:4F:4B': 'Fire Stick 1', 'C0:25:06:A2:AA:F5': 'FritzBox', 'BC:EE:7B:72:7B:57': 'carver', 'FC:65:DE:77:A6:8F': 'Fire Stick 2'}
-	if mac in readableNames:
-		return readableNames[mac]
-	else:
+	config = configparser.ConfigParser(delimiters='=')
+	config.read('config.ini')
+	try:
+		readableName = config.get("Devices", mac)
+		return readableName
+	except configparser.NoOptionError as e:
 		return False
 
 
