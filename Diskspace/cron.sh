@@ -9,4 +9,4 @@ fi
 if [ "$(uname -s)" = "Darwin" ]; then
 	export PATH=/usr/local/opt/python3/bin/:$PATH
 fi
-TZ=UTC python3 diskspace.py
+TZ=UTC python3 diskspace.py >> cron.log
