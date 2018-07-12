@@ -10,6 +10,7 @@ import time
 import subprocess
 import psutil
 from bs4 import BeautifulSoup
+import configparser
 
 def findCaller():
 	me = psutil.Process()
@@ -29,28 +30,28 @@ def debugPrint(output):
 def unimportantDevice(deviceName):
 	unimportantDevices = ['Moto E', 'Tablet']
 	if deviceName in unimportantDevices:
-		debugPrint("Ignoring device {}".format(deviceName))
+		debugPrint("Ignoring unimportant device {}".format(deviceName))
 		return True
 	return False
 
-def readableNameOf(deviceName,quiet=False):
-	readableNames = {'android-e53fd3d31e2': 'z1compact', 'Hanna': 'Hanna Laptop', 'android-45393a33648': 'Moto E', 'frost': 'frost', 'moneypenny': 'moneypenny', 'android-bc7e8ff9af1': 'Tablet', 'android-627a3a6eef0': 'Fairphone', 'android-4abaca69697': 'Z5 Compact'}
-	if deviceName in readableNames:
-		return readableNames[deviceName]
-	else:
-		if not(quiet):
-			print("	No readable name of {} known.".format(deviceName))
-		return deviceName
-
-def readableNameMac(device,quiet=False):
-	mac = device['mac']
-	readableNames = {'84:8E:DF:54:40:13': 'z1compact', '00:71:CC:41:0B:D1': 'Hanna Laptop', 'F8:CF:C5:4F:FA:DA': 'Moto E', 'B8:27:EB:4A:D9:5E': 'frost', 'E8:2A:EA:27:48:C7': 'moneypenny', 'BC:6E:64:3D:4C:BA': 'Tablet', '6C:AD:F8:44:09:B3': 'Fairphone', '58:48:22:7E:3B:1B': 'Z5 Compact', 'C4:B3:01:D5:CD:F7': 'LS Retail Macbook', 'F0:79:60:B4:CE:BD': 'Matthias iPhone', '0C:3E:9F:58:5E:DF': 'Ellis iPhone', '08:74:02:13:43:BF': 'Renatas iPhone', '50:1A:C5:F5:76:23': 'Mathias Surface', '00:0C:29:37:6F:34': 'LS Retail VM Ubuntu', '24:7F:3C:06:57:D9': 'Annejet Android', '74:DE:2B:9D:46:B0': 'Annejet Laptop', '5C:F7:C3:C0:31:64': 'Franzi Android', '74:C2:46:F7:4F:4B': 'Fire Stick', 'C0:25:06:A2:AA:F5': 'FritzBox', 'BC:EE:7B:72:7B:57': 'carver'}
-	if mac in readableNames:
-		return readableNames[mac]
+def readableNameOf(device,quiet=False):
+	name = readableNameMac(device['mac'])
+	if name != False:
+		return name
 	else:
 		if not(quiet):
 			debugPrint("	No readable name of {} known. Use self-given name {}.".format(mac,device['name']))
 		return device['name']
+
+def readableNameMac(mac):
+	config = configparser.ConfigParser(delimiters='=')
+	config.read('config.ini')
+	try:
+		readableName = config.get("Devices", mac)
+		return readableName
+	except configparser.NoOptionError as e:
+		return False
+
 
 def formatTimedifference(timeDifference):
 	if isinstance(timeDifference,datetime.timedelta):
@@ -90,11 +91,11 @@ def pingDevice(device):
 
 def pingIp(ip,device,tries=1):
 	for i in range(0,tries):
-		debugPrint("Ping {} ({}/{}), {}. try of {}".format(readableNameMac(device),ip,device['mac'],i,tries))
+		debugPrint("Ping {} ({}/{}), {}. try of {}".format(readableNameOf(device),ip,device['mac'],i,tries))
 		result = os.system("ping -qc 1 {} >/dev/null".format(ip))
 		if result == 0:
 			if i != 0:
-				print("{}. Ping to {} ({}) successfull.".format(i,readableNameMac(device['mac'],True),ip))
+				print("{}. Ping to {} ({}) successfull.".format(i,readableNameOf(device['mac'],True),ip))
 			return True
 		#time.sleep(3)
 	return False
@@ -142,32 +143,32 @@ def takeOverInfo(key, deviceInfo):
 		return None
 
 def cameOnlineCheck(device):
-	if unimportantDevice(readableNameMac(device)):
+	if unimportantDevice(readableNameOf(device)):
 		return
 	if 'lastState' in device:
 		if device['lastState'] != 'up':
 			if device['lastSeen'] is not None:
 				timeDifference = datetime.datetime.utcnow()-device['lastSeen']
 
-				print("{} -> 🌕. Last seen {} ({} ago).".format(readableNameMac(device),formatTime(device['lastSeen']),formatTimedifference(timeDifference)))
+				print("{} ⇑. Last seen {} ({} ago).".format(readableNameOf(device),formatTime(device['lastSeen']),formatTimedifference(timeDifference)))
 			else:
-				if not(unimportantDevice(readableNameMac(device))):
-					print("{} -> 🌕.".format(readableNameMac(device)))
+				if not(unimportantDevice(readableNameOf(device))):
+					print("{} ⇑.".format(readableNameOf(device)))
 	else:
-		print("New device {} came online.".format(readableNameMac(device)))
+		print("New device {} came online.".format(readableNameOf(device)))
 
 def wentOfflineCheck(device):
-	if unimportantDevice(readableNameMac(device)):
+	if unimportantDevice(readableNameOf(device)):
 		return
 	if 'lastState' in device:
 		if device['lastState'] != 'down':
 			if device['lastOffline'] is not None:
 				timeDifference = datetime.datetime.utcnow()-device['lastOffline']
-				print("{} -> 🌑. Online since {} ({} ago).".format(readableNameMac(device),formatTime(device['lastOffline']),formatTimedifference(timeDifference)))
+				print("{} ⇓. Online since {} ({} ago).".format(readableNameOf(device),formatTime(device['lastOffline']),formatTimedifference(timeDifference)))
 			else:
-				print("{} -> 🌑.".format(readableNameMac(device)))
+				print("{} ⇓.".format(readableNameOf(device)))
 	else:
-		print("New device {} seen, but is offline.".format(readableNameMac(device)))
+		print("New device {} seen, but is offline.".format(readableNameOf(device)))
 
 def loadDevicesFromRouter():
 	#http.client.HTTPConnection.debuglevel = 1
@@ -227,7 +228,6 @@ def loadDevicesFromRouter():
 			except ValueError as e:
 				expiresFormatted = None
 			clients.append({'name': name, 'network': etherOrWifi, 'mac': mac, 'ip': ip, 'expireTime': expiresFormatted})
-	debugPrint(clients)
 
 	# log out
 	response = urllib.request.urlopen(logoutPath)
@@ -249,22 +249,27 @@ for client in clientsList:
 	ip = client['ip']
 	mac = client['mac']
 	expireTime = client['expireTime']
-	expiresIn = expireTime-datetime.datetime.now()
-	#print('Expires in {}s'.format(expiresIn.total_seconds()))
-	lastConnect = datetime.timedelta(seconds=86400)-expiresIn
-	debugPrint("- {} is on {} with the ip {} and the MAC {}, expire time: {}, last connect {} ago.".format(name,network,ip,mac,expireTime,lastConnect))
+	if not(expireTime is None):
+		expiresIn = expireTime-datetime.datetime.now()
+		# 25 hours?
+		expireDelta = datetime.timedelta(seconds=86400+3600)
 
-	# ping ip once to fill arp cache
-	#pingIp(ip,1)
+		lastConnectDiff = expiresIn-expireDelta
+		lastConnect = expireTime-expireDelta
+		debugPrint("- {} ({}) is on {} with the ip {} and the MAC {}, expire time: {} (which is in {}), last connect: {} (which is {} ago).".format(readableNameMac(mac),name,network,ip,mac,expireTime,expiresIn,lastConnect,-lastConnectDiff))
+	else:
+		lastConnectDiff = None
+		debugPrint("- {} ({}) is on {} with the ip {} and the MAC {}, expire time: {}.".format(readableNameMac(mac),name,network,ip,mac,expireTime))
 
 	# build entry
-	deviceInfo = {'name': name, 'network': network, 'mac': mac, 'ip': ip, 'expireTime': expireTime, 'lastConnect': lastConnect}
+	deviceInfo = {'name': name, 'network': network, 'mac': mac, 'ip': ip, 'expireTime': expireTime, 'lastConnectDiff': lastConnectDiff}
 
 	# check if there is already info to take over
 	if mac in devices:
 		deviceInfo['lastSeen'] = takeOverInfo('lastSeen', devices[mac])
 		deviceInfo['lastOffline'] = takeOverInfo('lastOffline', devices[mac])
 		deviceInfo['lastState'] = takeOverInfo('lastState', devices[mac])
+
 		# a devices name changed
 		if name != devices[mac]['name']:
 			print("MAC {}/Name {} is also known as {}.".format(mac,devices[mac]['name'],name))
@@ -281,43 +286,56 @@ for deviceMac in devices:
 	if deviceMac == "":
 		continue
 	device = devices[deviceMac]
-	if not(checkIfMacInDeviceList(clientsList,deviceMac)):
-		debugPrint('Device {} currently not known to router, ignoring.'.format(device['name']))
-		continue
+
+	debugPrint('Checking if we can ignore the device {} ({}):'.format(readableNameMac(device['mac']),device['name']))
+	if not(checkIfMacInDeviceList(clientsList,deviceMac)) and device['lastState'] != 'up':
+		debugPrint('	This device is currently not known to the router and its last known state was {}.'.format(device['lastState']))
+		if device['lastSeen'] is None:
+			debugPrint('	Device has no last seen info. Ignoring.')
+			continue
+
+		lastSeenDiff = datetime.datetime.now() - device['lastSeen']
+		# check devices seen in the last week
+		checkPeriod = datetime.timedelta(seconds=7*24*60*60)
+		debugPrint('	Checking last seen date: Last seen {}, which is {} ago.'.format(device['lastSeen'],lastSeenDiff))
+		if lastSeenDiff >= checkPeriod:
+			debugPrint('	Device has been last seen longer than a week ago. Ignoring.')
+			continue
+	debugPrint("	Don't ignore.")
 	# TODO: check if IP and MAC match
 	# first get IP from MAC
 	macIp = getIpFromMac(device['mac'])
 	if macIp == False:
 		# look if IP is assigned to someone else
-		debugPrint("X Device {} with MAC {} has no IP in ARP cache.".format(readableNameMac(device),device['mac']))
+		debugPrint("X Device {} with MAC {} has no IP in ARP cache.".format(readableNameOf(device),device['mac']))
 		# if we know an IP of the device
 		# TODO? get IP from table info
 		if 'ip' in device.keys():
 			currentOwner = getMacFromArp(device['ip'])
 			if currentOwner != False:
-				debugPrint("X! Its IP {} is currenly owned by {}. Ignoring.".format(device['ip'],readableNameMac({'mac': currentOwner, 'name': currentOwner})))
+				debugPrint("X! Its IP {} is currenly owned by {}. Ignoring.".format(device['ip'],readableNameOf({'mac': currentOwner, 'name': currentOwner})))
 				continue
 			else:
-				#print("XX The IP {} of {} is currenly not owned by anyone. Pinging.".format(device['ip'],readableNameMac(device)))
+				#print("XX The IP {} of {} is currenly not owned by anyone. Pinging.".format(device['ip'],readableNameOf(device)))
 				pingIp(device['ip'],device)
 	elif macIp != device['ip']:
 		# mismatch between table IP and the one from the ARP cache. Should not happen
-		print("! Ignoring device {} because its IP {} is not {} which is assigned to its MAC {}.".format(readableNameMac(device),device['ip'],macIp,device['mac']))
+		print("! Ignoring device {} because its IP {} is not {} which is assigned to its MAC {}.".format(readableNameOf(device),device['ip'],macIp,device['mac']))
 		continue
 	if not 'ip' in device.keys():
-		#print("! Device {} has no known IP. Ignoring.".format(readableNameMac(device)))
+		#print("! Device {} has no known IP. Ignoring.".format(readableNameOf(device)))
 		continue
 	# ping device
 	if pingDevice(device):
-		debugPrint("+ Host {} appears to be up.".format(readableNameMac(device)))
+		debugPrint("+ Host {} appears to be up.".format(readableNameOf(device)))
 		cameOnlineCheck(device)
 		devices[deviceMac]['lastSeen'] = datetime.datetime.now()
 		devices[deviceMac]['lastState'] = 'up'
 	else:
-		debugPrint("+ Host {} appears to be down. Last connect ~{} ago. Last seen {}.".format(readableNameMac(device),formatTimedifference(device['lastConnect']),device['lastSeen']))
+		debugPrint("+ Host {} appears to be down. Last connect ~{} ago. Last seen {}.".format(readableNameOf(device),formatTimedifference(device['lastConnectDiff']),device['lastSeen']))
 		wentOfflineCheck(device)
 		devices[deviceMac]['lastState'] = 'down'
 		devices[deviceMac]['lastOffline'] = datetime.datetime.now()
 
 
-#storeDevicelist(devices)
+storeDevicelist(devices)
