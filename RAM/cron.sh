@@ -5,4 +5,4 @@ if [ "$(uname -s)" = "Darwin" ]; then
         export PATH=/usr/local/opt/python3/bin/:$PATH
 fi
 
-TZ=UTC python3.6 ramUsage.py >> cron.log
+LANG=POSIX TZ=UTC python3 ramUsage.py >> cron.log
