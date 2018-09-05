@@ -11,6 +11,8 @@ import subprocess
 import psutil
 from bs4 import BeautifulSoup
 import configparser
+import json
+import copy
 
 def findCaller():
 	me = psutil.Process()
@@ -28,7 +30,7 @@ def debugPrint(output):
 		print('D: {}'.format(output))
 
 def unimportantDevice(deviceName):
-	unimportantDevices = ['Moto E', 'Tablet']
+	unimportantDevices = ['Florin Moto E', 'Tablet']
 	if deviceName in unimportantDevices:
 		debugPrint("Ignoring unimportant device {}".format(deviceName))
 		return True
@@ -92,7 +94,10 @@ def pingDevice(device):
 def pingIp(ip,device,tries=1):
 	for i in range(0,tries):
 		debugPrint("Ping {} ({}/{}), {}. try of {}".format(readableNameOf(device),ip,device['mac'],i,tries))
-		result = os.system("ping -qc 1 {} >/dev/null".format(ip))
+		# -q: quiet
+		# -c 1: one try
+		# -W 3: timeout 3 secs
+		result = os.system("ping -qc 1 -W 3 {} >/dev/null".format(ip))
 		if result == 0:
 			if i != 0:
 				print("{}. Ping to {} ({}) successfull.".format(i,readableNameOf(device['mac'],True),ip))
@@ -130,6 +135,65 @@ def storeDevicelist(devices):
 	with open('devicelist.p', 'wb') as output:
 		pickle.dump(devices, output)
 
+def jsonifyDates(device,keys):
+	for key in keys:
+		if key in device:
+			dateToFormat = device[key]
+			if dateToFormat is not None:
+				if isinstance(dateToFormat, datetime.datetime):
+					device[key] = dateToFormat.strftime("%s")
+				else:
+					if key != 'expireTime':
+						print("Unknown instance {} on key {}. Setting to none.".format(type(dateToFormat),key))
+					device[key] = None
+	return device
+
+def sanitizeDevice(device,deviceMac):
+	device['mac'] = deviceMac
+	device['readableName'] = readableNameMac(deviceMac)
+	if 'lastConnectDiff' in device.keys():
+		del(device['lastConnectDiff'])
+	device = jsonifyDates(device,['expireTime', 'lastOffline', 'lastSeen', 'lastConnect'])
+	return device
+
+def mqttSendAllDevices(devices):
+	devicesInfo = {}
+	for deviceMac in devices.keys():
+		# make deepcoyp so we don't change anything in the existing objects
+		devicesInfo[deviceMac] = sanitizeDevice(copy.deepcopy(devices[deviceMac]),deviceMac)
+
+	mqttDict = {
+		"topic": "devicesInNetwork",
+		"measurements": devicesInfo
+	}
+	#print(mqttDict)
+	mqttSend(mqttDict)
+
+def mqttSendStatusChange(deviceInfo):
+	return
+	print(deviceInfo)
+	message = deviceInfo['message']
+	device = deviceInfo['device']
+
+	mqttDict = {
+		"topic": "devicesInNetworkStatusChange",
+		"measurements": {
+			"message": message,
+			"device": sanitizeDevice(copy.deepcopy(device))
+		}
+	}
+
+	#mqttSend(mqttDict)
+
+def mqttSend(jsonDict):
+	config = configparser.ConfigParser(delimiters='=')
+	config.read('config.ini')
+	jsonData = json.dumps(jsonDict)
+	#debugPrint("Writing JSON: {}".format(jsonData))
+	sender = subprocess.Popen([config.get("Paths", "mqttPath")], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+	output, errors = sender.communicate(jsonData.encode("utf-8"))
+	#debugPrint("Output: {}, errors: {}".format(output,errors))
+
 def checkIfMacInDeviceList(devices,mac):
 	for device in devices:
 		if mac == device['mac']:
@@ -143,32 +207,46 @@ def takeOverInfo(key, deviceInfo):
 		return None
 
 def cameOnlineCheck(device):
+	message = None
 	if unimportantDevice(readableNameOf(device)):
 		return
 	if 'lastState' in device:
 		if device['lastState'] != 'up':
 			if device['lastSeen'] is not None:
 				timeDifference = datetime.datetime.utcnow()-device['lastSeen']
+				message = "{} ⇑. Last seen {} ({} ago).".format(readableNameOf(device),formatTime(device['lastSeen']),formatTimedifference(timeDifference))
 
-				print("{} ⇑. Last seen {} ({} ago).".format(readableNameOf(device),formatTime(device['lastSeen']),formatTimedifference(timeDifference)))
 			else:
 				if not(unimportantDevice(readableNameOf(device))):
-					print("{} ⇑.".format(readableNameOf(device)))
+					message = "{} ⇑.".format(readableNameOf(device))
 	else:
-		print("New device {} came online.".format(readableNameOf(device)))
+		message = "New device {} came online.".format(readableNameOf(device))
+	if message is not None:
+		deviceInfo = {
+			'device': device,
+			'message': message
+		}
+		mqttSendStatusChange(deviceInfo)
 
 def wentOfflineCheck(device):
+	message = None
 	if unimportantDevice(readableNameOf(device)):
 		return
 	if 'lastState' in device:
 		if device['lastState'] != 'down':
-			if device['lastOffline'] is not None:
+			if device['lastOffline'] is not None and isinstance(device['lastOffline'],datetime.datetime):
 				timeDifference = datetime.datetime.utcnow()-device['lastOffline']
-				print("{} ⇓. Online since {} ({} ago).".format(readableNameOf(device),formatTime(device['lastOffline']),formatTimedifference(timeDifference)))
+				message ="{} ⇓. Online since {} ({} ago).".format(readableNameOf(device),formatTime(device['lastOffline']),formatTimedifference(timeDifference))
 			else:
-				print("{} ⇓.".format(readableNameOf(device)))
+				message = "{} ⇓.".format(readableNameOf(device))
 	else:
-		print("New device {} seen, but is offline.".format(readableNameOf(device)))
+		message = "New device {} seen, but is offline.".format(readableNameOf(device))
+	if message is not None:
+		deviceInfo = {
+			'device': device,
+			'message': message
+		}
+		mqttSendStatusChange(deviceInfo)
 
 def loadDevicesFromRouter():
 	#http.client.HTTPConnection.debuglevel = 1
@@ -226,6 +304,7 @@ def loadDevicesFromRouter():
 			try:
 				expiresFormatted = datetime.datetime.strptime(expires, "%Y-%m-%d %H:%M:%S")
 			except ValueError as e:
+				debugPrint("Unexpected expire format: {}".format(expires))
 				expiresFormatted = None
 			clients.append({'name': name, 'network': etherOrWifi, 'mac': mac, 'ip': ip, 'expireTime': expiresFormatted})
 
@@ -259,10 +338,11 @@ for client in clientsList:
 		debugPrint("- {} ({}) is on {} with the ip {} and the MAC {}, expire time: {} (which is in {}), last connect: {} (which is {} ago).".format(readableNameMac(mac),name,network,ip,mac,expireTime,expiresIn,lastConnect,-lastConnectDiff))
 	else:
 		lastConnectDiff = None
+		lastConnect = None
 		debugPrint("- {} ({}) is on {} with the ip {} and the MAC {}, expire time: {}.".format(readableNameMac(mac),name,network,ip,mac,expireTime))
 
 	# build entry
-	deviceInfo = {'name': name, 'network': network, 'mac': mac, 'ip': ip, 'expireTime': expireTime, 'lastConnectDiff': lastConnectDiff}
+	deviceInfo = {'name': name, 'network': network, 'mac': mac, 'ip': ip, 'expireTime': expireTime, 'lastConnectDiff': lastConnectDiff, 'lastConnect': lastConnect}
 
 	# check if there is already info to take over
 	if mac in devices:
@@ -320,7 +400,7 @@ for deviceMac in devices:
 				pingIp(device['ip'],device)
 	elif macIp != device['ip']:
 		# mismatch between table IP and the one from the ARP cache. Should not happen
-		print("! Ignoring device {} because its IP {} is not {} which is assigned to its MAC {}.".format(readableNameOf(device),device['ip'],macIp,device['mac']))
+		debugPrint("! Ignoring device {} because its IP {} is not {} which is assigned to its MAC {}.".format(readableNameOf(device),device['ip'],macIp,device['mac']))
 		continue
 	if not 'ip' in device.keys():
 		#print("! Device {} has no known IP. Ignoring.".format(readableNameOf(device)))
@@ -332,10 +412,10 @@ for deviceMac in devices:
 		devices[deviceMac]['lastSeen'] = datetime.datetime.now()
 		devices[deviceMac]['lastState'] = 'up'
 	else:
-		debugPrint("+ Host {} appears to be down. Last connect ~{} ago. Last seen {}.".format(readableNameOf(device),formatTimedifference(device['lastConnectDiff']),device['lastSeen']))
+		#debugPrint("+ Host {} appears to be down. Last connect ~{} ago. Last seen {}.".format(readableNameOf(device),formatTimedifference(device['lastConnectDiff']),device['lastSeen']))
 		wentOfflineCheck(device)
 		devices[deviceMac]['lastState'] = 'down'
 		devices[deviceMac]['lastOffline'] = datetime.datetime.now()
 
-
+mqttSendAllDevices(devices)
 storeDevicelist(devices)
