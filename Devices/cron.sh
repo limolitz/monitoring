@@ -1,4 +1,6 @@
 #!/bin/bash
 cd $(dirname "${BASH_SOURCE[0]}")
 
-/usr/bin/python3 callDevices.py >> cron.log
+source bin/activate
+
+python3.7 callDevices.py >> cron.log

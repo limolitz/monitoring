@@ -1,5 +1,6 @@
-#!/usr/bin/env python3
-import http.client
+#!/usr/bin/env python3.7
+#-*- coding: UTF-8 -*-
+
 import urllib.request
 import urllib.parse
 import re
@@ -13,6 +14,8 @@ from bs4 import BeautifulSoup
 import configparser
 import json
 import copy
+import http.client, http.cookiejar
+import asyncio
 
 def findCaller():
 	me = psutil.Process()
@@ -42,12 +45,14 @@ def readableNameOf(device,quiet=False):
 		return name
 	else:
 		if not(quiet):
-			debugPrint("	No readable name of {} known. Use self-given name {}.".format(mac,device['name']))
+			debugPrint("	No readable name of {} known. Use self-given name {}.".format(device['mac'],device['name']))
 		return device['name']
 
 def readableNameMac(mac):
 	config = configparser.ConfigParser(delimiters='=')
 	config.read('config.ini')
+	if not isinstance(mac, str):
+		return False
 	try:
 		readableName = config.get("Devices", mac)
 		return readableName
@@ -87,6 +92,24 @@ def formatTime(time):
 		return time.strftime("%d.%m %H:%M")
 	return time.strftime("today, %H:%M")
 
+async def pingDeviceAsync(device):
+	ip = getIpFromMac(device['mac'])
+	return (device,await pingIpAsync(device['ip'],device))
+
+async def pingIpAsync(ip,device,tries=1):
+	for i in range(0,tries):
+		debugPrint("Ping {} ({}/{}), {}. try of {}".format(readableNameOf(device),ip,device['mac'],i,tries))
+		# -q: quiet
+		# -c 1: one try
+		# -W 3: timeout 3 secs
+		result = os.system("ping -qc 1 -W 3 {} >/dev/null".format(ip))
+		if result == 0:
+			if i != 0:
+				print("{}. Ping to {} ({}) successfull.".format(i,readableNameOf(device['mac'],True),ip))
+			return True
+		#time.sleep(3)
+	return False
+
 def pingDevice(device):
 	ip = getIpFromMac(device['mac'])
 	return pingIp(device['ip'],device)
@@ -109,7 +132,7 @@ def sshTestDevice(ip):
 	return os.system("ssh '{}' true > /dev/null".format(ip)) == 0
 
 def getMacFromArp(ip):
-	line = subprocess.Popen("/usr/sbin/arp -a | grep '{}' | grep -oP '[a-f\:0-9]{{17}}'".format(ip), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True).stdout.read().split()
+	line = subprocess.Popen("/usr/sbin/arp -an | grep '{}' | grep -oP '[a-f\:0-9]{{17}}'".format(ip), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True).stdout.read().split()
 	if len(line) > 0:
 		return line[0].decode("utf-8").upper()
 	else:
@@ -248,9 +271,54 @@ def wentOfflineCheck(device):
 		}
 		mqttSendStatusChange(deviceInfo)
 
-def loadDevicesFromRouter():
-	#http.client.HTTPConnection.debuglevel = 1
+def loadDevicesFromNmap():
+	clients = []
+	line = subprocess.Popen("/usr/bin/nmap -sn 192.168.1.* -oX -", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True).stdout.read()
+	#print(line)
+	soup = BeautifulSoup(line, 'lxml-xml')
+	for host in soup.find_all('host'):
+		ip = host.find('address')['addr']
+		hostname = host.find('hostname')['name']
+		mac = getMacFromArp(ip)
+		if mac == False:
+			if hostname == "frost.lan":
+				mac = 'B8:27:EB:4A:D9:5E'
+			else:
+				print("Mac is none for {}.".format(hostname))
+		if readableNameMac(mac) != False:
+			hostname = readableNameMac(mac)
+		#print("{} with IP {} and MAC {}".format(hostname,ip,mac))
+		clients.append({'name': hostname, 'mac': mac, 'ip': ip, 'expireTime': None})
 
+	return clients
+
+def loadDevicesFromRouter():
+	cj = http.cookiejar.LWPCookieJar()
+	opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj),urllib.request.HTTPHandler(debuglevel=1))
+	urllib.request.install_opener(opener)
+
+	clients = []
+	clients.append({'name': 'frost', 'mac': 'B8:27:EB:4A:D9:5E', 'ip': '192.168.1.230', 'expireTime': datetime.datetime.now()})
+
+	devicelist = 'http://192.168.1.1/modals/device-modal.lp'
+	response = urllib.request.urlopen(devicelist)
+	html = response.read().decode('utf8')
+	soup = BeautifulSoup(html, 'html.parser')
+
+	# load form
+	csrf = soup.find('meta', attrs={'name': 'CSRFtoken'})['content']
+	print(csrf)
+	form = soup.find_all('form')
+	print(form)
+	#password='HQ153AY7'
+	password='1bc83a4d132f838fd43fde3a690908418e8405627edec16ade4df72cd75faed622af00528205cbabb2e7dea2362558f3ad52b62dd7472d976b3b4d3f6e458732c1bfc33b11115c6fdcfda686e540fcade074dc0e9abbe84970f86fb1eb161f9240db6bebf77b8dac80f91f4aacc0b4915315030fecba142267eeb56d536d7011c426af0291f71b64a44e91f9ea9e922152a1d6b4afd796798aa6696bf3238cc2c76a6c0bc00589412cc6351fed1aeec9ece30feba5395b56482717d49af1a8689f7de5d5c26f8dbf0ddb61dd5ae81e67059a4d08ad00f68dd646459969bebea35b19a02c58770d0920f529a59ed0fc97a0f65da2fd8986fba29e93a182313af8'
+	data = "I=Administrator&A={}&CSRFtoken={}".format(password,csrf).encode()
+	req = urllib.request.Request(devicelist, data=data, method='POST')
+	response = urllib.request.urlopen(req)
+	html = response.read().decode('utf8')
+	print(html)
+
+def loadDevicesFromRouterBonn():
 	devicelist = 'http://192.168.0.1/basic/dhcp.asp'
 	loginPath = 'http://192.168.0.1/goform/login'
 	systemPath = 'http://192.168.0.1/status/system.asp'
@@ -306,7 +374,7 @@ def loadDevicesFromRouter():
 			except ValueError as e:
 				debugPrint("Unexpected expire format: {}".format(expires))
 				expiresFormatted = None
-			clients.append({'name': name, 'network': etherOrWifi, 'mac': mac, 'ip': ip, 'expireTime': expiresFormatted})
+			clients.append({'name': name, 'mac': mac, 'ip': ip, 'expireTime': expiresFormatted})
 
 	# log out
 	response = urllib.request.urlopen(logoutPath)
@@ -314,108 +382,115 @@ def loadDevicesFromRouter():
 
 	return clients
 
-#print("Caller: {}, manual call? {}".format(findCaller(),getIfManualCall()))
+async def main():
+	devices = loadDevicelist()
+	clientsList = loadDevicesFromNmap()
 
-devices = loadDevicelist()
-clientsList = loadDevicesFromRouter()
+	for client in clientsList:
+		# divide infos
+		# name elements
+		name = client['name']
+		ip = client['ip']
+		mac = client['mac']
+		expireTime = client['expireTime']
+		if not(expireTime is None):
+			expiresIn = expireTime-datetime.datetime.now()
+			# 25 hours?
+			expireDelta = datetime.timedelta(seconds=86400+3600)
 
-for client in clientsList:
-	# divide infos
-	#print(clientSplit)
-	# name elements
-	name = client['name']
-	network = client['network']
-	ip = client['ip']
-	mac = client['mac']
-	expireTime = client['expireTime']
-	if not(expireTime is None):
-		expiresIn = expireTime-datetime.datetime.now()
-		# 25 hours?
-		expireDelta = datetime.timedelta(seconds=86400+3600)
+			lastConnectDiff = expiresIn-expireDelta
+			lastConnect = expireTime-expireDelta
+			debugPrint("- {} ({}) with the ip {} and the MAC {}, expire time: {} (which is in {}), last connect: {} (which is {} ago).".format(readableNameMac(mac),name,ip,mac,expireTime,expiresIn,lastConnect,-lastConnectDiff))
+		else:
+			lastConnectDiff = None
+			lastConnect = None
+			debugPrint("- {} ({}) with the ip {} and the MAC {}, expire time: {}.".format(readableNameMac(mac),name,ip,mac,expireTime))
 
-		lastConnectDiff = expiresIn-expireDelta
-		lastConnect = expireTime-expireDelta
-		debugPrint("- {} ({}) is on {} with the ip {} and the MAC {}, expire time: {} (which is in {}), last connect: {} (which is {} ago).".format(readableNameMac(mac),name,network,ip,mac,expireTime,expiresIn,lastConnect,-lastConnectDiff))
-	else:
-		lastConnectDiff = None
-		lastConnect = None
-		debugPrint("- {} ({}) is on {} with the ip {} and the MAC {}, expire time: {}.".format(readableNameMac(mac),name,network,ip,mac,expireTime))
+		# build entry
+		deviceInfo = {'name': name, 'mac': mac, 'ip': ip, 'expireTime': expireTime, 'lastConnectDiff': lastConnectDiff, 'lastConnect': lastConnect}
 
-	# build entry
-	deviceInfo = {'name': name, 'network': network, 'mac': mac, 'ip': ip, 'expireTime': expireTime, 'lastConnectDiff': lastConnectDiff, 'lastConnect': lastConnect}
+		# check if there is already info to take over
+		if mac in devices:
+			deviceInfo['lastSeen'] = takeOverInfo('lastSeen', devices[mac])
+			deviceInfo['lastOffline'] = takeOverInfo('lastOffline', devices[mac])
+			deviceInfo['lastState'] = takeOverInfo('lastState', devices[mac])
 
-	# check if there is already info to take over
-	if mac in devices:
-		deviceInfo['lastSeen'] = takeOverInfo('lastSeen', devices[mac])
-		deviceInfo['lastOffline'] = takeOverInfo('lastOffline', devices[mac])
-		deviceInfo['lastState'] = takeOverInfo('lastState', devices[mac])
+			# a devices name changed
+			if name != devices[mac]['name']:
+				print("MAC {}/Name {} is also known as {}.".format(mac,devices[mac]['name'],name))
+		else:
+			print("New device {} with MAC {}. Pinging it to fill ARP cache.".format(name,mac))
+			pingDevice(deviceInfo)
+			deviceInfo['lastSeen'] = None
+			deviceInfo['lastOffline'] = None
+			deviceInfo['lastState'] = None
+		devices[mac] = deviceInfo
 
-		# a devices name changed
-		if name != devices[mac]['name']:
-			print("MAC {}/Name {} is also known as {}.".format(mac,devices[mac]['name'],name))
-	else:
-		print("New device {} with MAC {}. Pinging it to fill ARP cache.".format(name,mac))
-		pingDevice(deviceInfo)
-		deviceInfo['lastSeen'] = None
-		deviceInfo['lastOffline'] = None
-		deviceInfo['lastState'] = None
-	devices[mac] = deviceInfo
-
-# ping the devices
-for deviceMac in devices:
-	if deviceMac == "":
-		continue
-	device = devices[deviceMac]
-
-	debugPrint('Checking if we can ignore the device {} ({}):'.format(readableNameMac(device['mac']),device['name']))
-	if not(checkIfMacInDeviceList(clientsList,deviceMac)) and device['lastState'] != 'up':
-		debugPrint('	This device is currently not known to the router and its last known state was {}.'.format(device['lastState']))
-		if device['lastSeen'] is None:
-			debugPrint('	Device has no last seen info. Ignoring.')
+	# build the futures to ping the devices
+	futures = []
+	for deviceMac in devices:
+		if deviceMac == "":
 			continue
+		device = devices[deviceMac]
 
-		lastSeenDiff = datetime.datetime.now() - device['lastSeen']
-		# check devices seen in the last week
-		checkPeriod = datetime.timedelta(seconds=7*24*60*60)
-		debugPrint('	Checking last seen date: Last seen {}, which is {} ago.'.format(device['lastSeen'],lastSeenDiff))
-		if lastSeenDiff >= checkPeriod:
-			debugPrint('	Device has been last seen longer than a week ago. Ignoring.')
-			continue
-	debugPrint("	Don't ignore.")
-	# TODO: check if IP and MAC match
-	# first get IP from MAC
-	macIp = getIpFromMac(device['mac'])
-	if macIp == False:
-		# look if IP is assigned to someone else
-		debugPrint("X Device {} with MAC {} has no IP in ARP cache.".format(readableNameOf(device),device['mac']))
-		# if we know an IP of the device
-		# TODO? get IP from table info
-		if 'ip' in device.keys():
-			currentOwner = getMacFromArp(device['ip'])
-			if currentOwner != False:
-				debugPrint("X! Its IP {} is currenly owned by {}. Ignoring.".format(device['ip'],readableNameOf({'mac': currentOwner, 'name': currentOwner})))
+		debugPrint('Checking if we can ignore the device {} ({}):'.format(readableNameMac(device['mac']),device['name']))
+		if not(checkIfMacInDeviceList(clientsList,deviceMac)) and device['lastState'] != 'up':
+			debugPrint('	This device is currently not known to the router and its last known state was {}.'.format(device['lastState']))
+			if device['lastSeen'] is None:
+				debugPrint('	Device has no last seen info. Ignoring.')
 				continue
-			else:
-				#print("XX The IP {} of {} is currenly not owned by anyone. Pinging.".format(device['ip'],readableNameOf(device)))
-				pingIp(device['ip'],device)
-	elif macIp != device['ip']:
-		# mismatch between table IP and the one from the ARP cache. Should not happen
-		debugPrint("! Ignoring device {} because its IP {} is not {} which is assigned to its MAC {}.".format(readableNameOf(device),device['ip'],macIp,device['mac']))
-		continue
-	if not 'ip' in device.keys():
-		#print("! Device {} has no known IP. Ignoring.".format(readableNameOf(device)))
-		continue
-	# ping device
-	if pingDevice(device):
-		debugPrint("+ Host {} appears to be up.".format(readableNameOf(device)))
-		cameOnlineCheck(device)
-		devices[deviceMac]['lastSeen'] = datetime.datetime.now()
-		devices[deviceMac]['lastState'] = 'up'
-	else:
-		#debugPrint("+ Host {} appears to be down. Last connect ~{} ago. Last seen {}.".format(readableNameOf(device),formatTimedifference(device['lastConnectDiff']),device['lastSeen']))
-		wentOfflineCheck(device)
-		devices[deviceMac]['lastState'] = 'down'
-		devices[deviceMac]['lastOffline'] = datetime.datetime.now()
 
-mqttSendAllDevices(devices)
-storeDevicelist(devices)
+			lastSeenDiff = datetime.datetime.now() - device['lastSeen']
+			# check devices seen in the last week
+			checkPeriod = datetime.timedelta(seconds=7*24*60*60)
+			debugPrint('	Checking last seen date: Last seen {}, which is {} ago.'.format(device['lastSeen'],lastSeenDiff))
+			if lastSeenDiff >= checkPeriod:
+				debugPrint('	Device has been last seen longer than a week ago. Ignoring.')
+				continue
+		debugPrint("	Don't ignore.")
+		# TODO: check if IP and MAC match
+		# first get IP from MAC
+		macIp = getIpFromMac(device['mac'])
+		if macIp == False:
+			# look if IP is assigned to someone else
+			debugPrint("X Device {} with MAC {} has no IP in ARP cache.".format(readableNameOf(device),device['mac']))
+			# if we know an IP of the device
+			# TODO? get IP from table info
+			if 'ip' in device.keys():
+				currentOwner = getMacFromArp(device['ip'])
+				if currentOwner != False:
+					debugPrint("X! Its IP {} is currenly owned by {}. Ignoring.".format(device['ip'],readableNameOf({'mac': currentOwner, 'name': currentOwner})))
+					continue
+				else:
+					#print("XX The IP {} of {} is currenly not owned by anyone. Pinging.".format(device['ip'],readableNameOf(device)))
+					pingIp(device['ip'],device)
+		elif macIp != device['ip']:
+			# mismatch between table IP and the one from the ARP cache. Should not happen
+			debugPrint("! Ignoring device {} because its IP {} is not {} which is assigned to its MAC {}.".format(readableNameOf(device),device['ip'],macIp,device['mac']))
+			continue
+		if not 'ip' in device.keys():
+			#print("! Device {} has no known IP. Ignoring.".format(readableNameOf(device)))
+			continue
+		# ping device
+		futures.append(pingDeviceAsync(device))
+
+	for i, future in enumerate(asyncio.as_completed(futures)):
+		result = await future
+		device = result[0]
+		deviceMac = device['mac']
+		pingResult = result[1]
+		if pingResult:
+			debugPrint("+ Host {} at {} appears to be up.".format(readableNameOf(device),device['ip']))
+			cameOnlineCheck(device)
+			devices[deviceMac]['lastSeen'] = datetime.datetime.now()
+			devices[deviceMac]['lastState'] = 'up'
+		else:
+			debugPrint("+ Host {} appears to be down. Last connect ~{} ago. Last seen {}.".format(readableNameOf(device),formatTimedifference(device['lastConnectDiff']),device['lastSeen']))
+			wentOfflineCheck(device)
+			devices[deviceMac]['lastState'] = 'down'
+			devices[deviceMac]['lastOffline'] = datetime.datetime.now()
+
+	mqttSendAllDevices(devices)
+	storeDevicelist(devices)
+
+asyncio.run(main())
