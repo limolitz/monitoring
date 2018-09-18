@@ -173,9 +173,7 @@ def jsonifyDates(device,keys):
 def sanitizeDevice(device,deviceMac):
 	device['mac'] = deviceMac
 	device['readableName'] = readableNameMac(deviceMac)
-	if 'lastConnectDiff' in device.keys():
-		del(device['lastConnectDiff'])
-	device = jsonifyDates(device,['lastOffline', 'lastSeen', 'lastConnect'])
+	device = jsonifyDates(device,['lastOffline', 'lastSeen'])
 	return device
 
 def mqttSendAllDevices(devices):
@@ -394,12 +392,10 @@ async def main():
 		name = client['name']
 		ip = client['ip']
 		mac = client['mac']
-		lastConnectDiff = None
-		lastConnect = None
 		debugPrint("- {} ({}) with the ip {} and the MAC {}".format(readableNameMac(mac),name,ip,mac))
 
 		# build entry
-		deviceInfo = {'name': name, 'mac': mac, 'ip': ip, 'lastConnectDiff': lastConnectDiff, 'lastConnect': lastConnect}
+		deviceInfo = {'name': name, 'mac': mac, 'ip': ip}
 
 		# check if there is already info to take over
 		if mac in devices:
@@ -424,8 +420,10 @@ async def main():
 		if deviceMac == "":
 			continue
 		device = devices[deviceMac]
-		if 'expireTime' in device.keys():
-			del(device['expireTime'])
+		if 'lastConnectDiff' in device.keys():
+			del(device['lastConnectDiff'])
+		if 'lastConnect' in device.keys():
+			del(device['lastConnect'])
 		debugPrint('Checking if we can ignore the device {} ({}):'.format(readableNameMac(device['mac']),device['name']))
 		if not(checkIfMacInDeviceList(clientsList,deviceMac)) and device['lastState'] != 'up':
 			debugPrint('	This device is currently not known to the router and its last known state was {}.'.format(device['lastState']))
@@ -478,7 +476,7 @@ async def main():
 			devices[deviceMac]['lastSeen'] = datetime.datetime.now()
 			devices[deviceMac]['lastState'] = 'up'
 		else:
-			debugPrint("+ Host {} appears to be down. Last connect ~{} ago. Last seen {}.".format(readableNameOf(device),formatTimedifference(device['lastConnectDiff']),device['lastSeen']))
+			debugPrint("+ Host {} appears to be down. Last seen {}.".format(readableNameOf(device),device['lastSeen']))
 			wentOfflineCheck(device)
 			devices[deviceMac]['lastState'] = 'down'
 			devices[deviceMac]['lastOffline'] = datetime.datetime.now()
