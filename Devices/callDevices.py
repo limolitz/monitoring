@@ -166,8 +166,7 @@ def jsonifyDates(device,keys):
 				if isinstance(dateToFormat, datetime.datetime):
 					device[key] = dateToFormat.strftime("%s")
 				else:
-					if key != 'expireTime':
-						print("Unknown instance {} on key {}. Setting to none.".format(type(dateToFormat),key))
+					print("Unknown instance of {} on key {}. Setting to none.".format(type(dateToFormat),key))
 					device[key] = None
 	return device
 
@@ -176,7 +175,7 @@ def sanitizeDevice(device,deviceMac):
 	device['readableName'] = readableNameMac(deviceMac)
 	if 'lastConnectDiff' in device.keys():
 		del(device['lastConnectDiff'])
-	device = jsonifyDates(device,['expireTime', 'lastOffline', 'lastSeen', 'lastConnect'])
+	device = jsonifyDates(device,['lastOffline', 'lastSeen', 'lastConnect'])
 	return device
 
 def mqttSendAllDevices(devices):
@@ -278,7 +277,10 @@ def loadDevicesFromNmap():
 	soup = BeautifulSoup(line, 'lxml-xml')
 	for host in soup.find_all('host'):
 		ip = host.find('address')['addr']
-		hostname = host.find('hostname')['name']
+		if host.find('hostname') is not None:
+			hostname = host.find('hostname')['name']
+		else:
+			print("Hostname is none for {}.".format(ip))
 		mac = getMacFromArp(ip)
 		if mac == False:
 			if hostname == "frost.lan":
@@ -288,7 +290,7 @@ def loadDevicesFromNmap():
 		if readableNameMac(mac) != False:
 			hostname = readableNameMac(mac)
 		#print("{} with IP {} and MAC {}".format(hostname,ip,mac))
-		clients.append({'name': hostname, 'mac': mac, 'ip': ip, 'expireTime': None})
+		clients.append({'name': hostname, 'mac': mac, 'ip': ip})
 
 	return clients
 
@@ -392,22 +394,12 @@ async def main():
 		name = client['name']
 		ip = client['ip']
 		mac = client['mac']
-		expireTime = client['expireTime']
-		if not(expireTime is None):
-			expiresIn = expireTime-datetime.datetime.now()
-			# 25 hours?
-			expireDelta = datetime.timedelta(seconds=86400+3600)
-
-			lastConnectDiff = expiresIn-expireDelta
-			lastConnect = expireTime-expireDelta
-			debugPrint("- {} ({}) with the ip {} and the MAC {}, expire time: {} (which is in {}), last connect: {} (which is {} ago).".format(readableNameMac(mac),name,ip,mac,expireTime,expiresIn,lastConnect,-lastConnectDiff))
-		else:
-			lastConnectDiff = None
-			lastConnect = None
-			debugPrint("- {} ({}) with the ip {} and the MAC {}, expire time: {}.".format(readableNameMac(mac),name,ip,mac,expireTime))
+		lastConnectDiff = None
+		lastConnect = None
+		debugPrint("- {} ({}) with the ip {} and the MAC {}".format(readableNameMac(mac),name,ip,mac))
 
 		# build entry
-		deviceInfo = {'name': name, 'mac': mac, 'ip': ip, 'expireTime': expireTime, 'lastConnectDiff': lastConnectDiff, 'lastConnect': lastConnect}
+		deviceInfo = {'name': name, 'mac': mac, 'ip': ip, 'lastConnectDiff': lastConnectDiff, 'lastConnect': lastConnect}
 
 		# check if there is already info to take over
 		if mac in devices:
@@ -432,7 +424,8 @@ async def main():
 		if deviceMac == "":
 			continue
 		device = devices[deviceMac]
-
+		if 'expireTime' in device.keys():
+			del(device['expireTime'])
 		debugPrint('Checking if we can ignore the device {} ({}):'.format(readableNameMac(device['mac']),device['name']))
 		if not(checkIfMacInDeviceList(clientsList,deviceMac)) and device['lastState'] != 'up':
 			debugPrint('	This device is currently not known to the router and its last known state was {}.'.format(device['lastState']))
