@@ -16,6 +16,7 @@ import json
 import copy
 import http.client, http.cookiejar
 import asyncio
+import sys
 
 def findCaller():
 	me = psutil.Process()
@@ -32,16 +33,9 @@ def debugPrint(output):
 	if getIfManualCall():
 		print('D: {}'.format(output))
 
-def unimportantDevice(deviceName):
-	unimportantDevices = ['Florin Moto E', 'Tablet']
-	if deviceName in unimportantDevices:
-		debugPrint("Ignoring unimportant device {}".format(deviceName))
-		return True
-	return False
-
 def readableNameOf(device,quiet=False):
 	name = readableNameMac(device['mac'])
-	if name != False:
+	if name is not False:
 		return name
 	else:
 		if not(quiet):
@@ -52,6 +46,7 @@ def readableNameMac(mac):
 	config = configparser.ConfigParser(delimiters='=')
 	config.read('config.ini')
 	if not isinstance(mac, str):
+		print("Given mac {} is not a string: {}.".format(mac,type(mac)))
 		return False
 	try:
 		readableName = config.get("Devices", mac)
@@ -105,9 +100,8 @@ async def pingIpAsync(ip,device,tries=1):
 		result = os.system("ping -qc 1 -W 3 {} >/dev/null".format(ip))
 		if result == 0:
 			if i != 0:
-				print("{}. Ping to {} ({}) successfull.".format(i,readableNameOf(device['mac'],True),ip))
+				debugPrint("{}. Ping to {} ({}) successfull.".format(i,readableNameOf(device['mac'],True),ip))
 			return True
-		#time.sleep(3)
 	return False
 
 def pingDevice(device):
@@ -123,9 +117,8 @@ def pingIp(ip,device,tries=1):
 		result = os.system("ping -qc 1 -W 3 {} >/dev/null".format(ip))
 		if result == 0:
 			if i != 0:
-				print("{}. Ping to {} ({}) successfull.".format(i,readableNameOf(device['mac'],True),ip))
+				debugPrint("{}. Ping to {} ({}) successfull.".format(i,readableNameOf(device['mac'],True),ip))
 			return True
-		#time.sleep(3)
 	return False
 
 def sshTestDevice(ip):
@@ -136,11 +129,11 @@ def getMacFromArp(ip):
 	if len(line) > 0:
 		return line[0].decode("utf-8").upper()
 	else:
-		return False
+		debugPrint("Could not find a MAC for IP {}.".format(ip))
+		return None
 
 def getIpFromMac(mac):
-	#debugPrint("Searching for IP of MAC {}".format(mac))
-	line = subprocess.Popen("/usr/sbin/arp -na | grep -i '{}' | awk '{{print $2}}' | cut -c 2- | rev | cut -c 2- | rev".format(mac),  stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True).stdout.read().split()
+	line = subprocess.Popen("/usr/sbin/arp -na | grep -i '{}' | awk '{{print $2}}' | cut -c 2- | rev | cut -c 2- | rev".format(mac), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True).stdout.read().split()
 	if len(line) > 0:
 		return line[0].decode("utf-8")
 	else:
@@ -228,8 +221,6 @@ def takeOverInfo(key, deviceInfo):
 
 def cameOnlineCheck(device):
 	message = None
-	if unimportantDevice(readableNameOf(device)):
-		return
 	if 'lastState' in device:
 		if device['lastState'] != 'up':
 			if device['lastSeen'] is not None:
@@ -237,8 +228,7 @@ def cameOnlineCheck(device):
 				message = "{} ⇑. Last seen {} ({} ago).".format(readableNameOf(device),formatTime(device['lastSeen']),formatTimedifference(timeDifference))
 
 			else:
-				if not(unimportantDevice(readableNameOf(device))):
-					message = "{} ⇑.".format(readableNameOf(device))
+				message = "{} ⇑.".format(readableNameOf(device))
 	else:
 		message = "New device {} came online.".format(readableNameOf(device))
 	if message is not None:
@@ -250,8 +240,6 @@ def cameOnlineCheck(device):
 
 def wentOfflineCheck(device):
 	message = None
-	if unimportantDevice(readableNameOf(device)):
-		return
 	if 'lastState' in device:
 		if device['lastState'] != 'down':
 			if device['lastOffline'] is not None and isinstance(device['lastOffline'],datetime.datetime):
@@ -271,25 +259,26 @@ def wentOfflineCheck(device):
 def loadDevicesFromNmap():
 	clients = []
 	line = subprocess.Popen("/usr/bin/nmap -sn 192.168.1.* -oX -", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True).stdout.read()
-	#print(line)
 	soup = BeautifulSoup(line, 'lxml-xml')
 	for host in soup.find_all('host'):
 		ip = host.find('address')['addr']
 		if host.find('hostname') is not None:
 			hostname = host.find('hostname')['name']
-		else:
-			print("Hostname is none for {}.".format(ip))
 		mac = getMacFromArp(ip)
-		if mac == False:
-			if hostname == "frost.lan":
-				mac = 'B8:27:EB:4A:D9:5E'
-			else:
-				print("Mac is none for {}.".format(hostname))
-		if readableNameMac(mac) != False:
+		# fix own MAC which can't be found in arp table
+		if mac is None and hostname == "frost.lan":
+			mac = 'B8:27:EB:4A:D9:5E'
+		# still no mac, we can't store the info about the device, so we ignore it
+		if mac is None:
+			print("No MAC for host {} from nmap, ignoring.".format(host))
+			continue
+		if readableNameMac(mac) is not False:
 			hostname = readableNameMac(mac)
-		#print("{} with IP {} and MAC {}".format(hostname,ip,mac))
-		clients.append({'name': hostname, 'mac': mac, 'ip': ip})
-
+		if mac is not None and hostname is not None and not(isinstance(mac, bool)):
+			debugPrint("Hostname {}, MAC {}, IP {}.".format(hostname, mac, ip))
+			clients.append({'name': hostname, 'mac': mac, 'ip': ip})
+		else:
+			print("Mac or Hostname is none or bool for {},{} at IP {}.".format(mac, hostname, ip))
 	return clients
 
 async def main():
@@ -327,9 +316,16 @@ async def main():
 	# build the futures to ping the devices
 	futures = []
 	for deviceMac in devices:
-		if deviceMac == "":
-			continue
 		device = devices[deviceMac]
+		if deviceMac == "":
+			print("Ignoring device {} because its MAC is empty.".format(device),file=sys.stderr)
+			continue
+		if deviceMac is None:
+			print("Ignoring device {} because its MAC is None.".format(device),file=sys.stderr)
+			continue
+		if isinstance(deviceMac, bool):
+			print("Ignoring device {} because its MAC is {}.".format(device, deviceMac),file=sys.stderr)
+			continue
 		if 'lastConnectDiff' in device.keys():
 			del(device['lastConnectDiff'])
 		if 'lastConnect' in device.keys():
@@ -352,14 +348,14 @@ async def main():
 		# TODO: check if IP and MAC match
 		# first get IP from MAC
 		macIp = getIpFromMac(device['mac'])
-		if macIp == False:
+		if macIp is False:
 			# look if IP is assigned to someone else
 			debugPrint("X Device {} with MAC {} has no IP in ARP cache.".format(readableNameOf(device),device['mac']))
 			# if we know an IP of the device
 			# TODO? get IP from table info
 			if 'ip' in device.keys():
 				currentOwner = getMacFromArp(device['ip'])
-				if currentOwner != False:
+				if currentOwner is not None:
 					debugPrint("X! Its IP {} is currenly owned by {}. Ignoring.".format(device['ip'],readableNameOf({'mac': currentOwner, 'name': currentOwner})))
 					continue
 				else:
@@ -370,7 +366,7 @@ async def main():
 			debugPrint("! Ignoring device {} because its IP {} is not {} which is assigned to its MAC {}.".format(readableNameOf(device),device['ip'],macIp,device['mac']))
 			continue
 		if not 'ip' in device.keys():
-			#print("! Device {} has no known IP. Ignoring.".format(readableNameOf(device)))
+			debugPrint("! Device {} has no known IP. Ignoring.".format(readableNameOf(device)))
 			continue
 		# ping device
 		futures.append(pingDeviceAsync(device))
@@ -392,6 +388,9 @@ async def main():
 			devices[deviceMac]['lastOffline'] = datetime.datetime.now()
 
 	mqttSendAllDevices(devices)
+	if False in devices.keys():
+		print("Deleting device with MAC False: {}".format(devices[False]),file=sys.stderr)
+		del(devices[False])
 	storeDevicelist(devices)
 
 asyncio.run(main())
