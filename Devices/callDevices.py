@@ -1,5 +1,5 @@
 #!/usr/bin/env python3.7
-#-*- coding: UTF-8 -*-
+# -*- coding: UTF-8 -*-
 
 import urllib.request
 import urllib.parse
@@ -14,7 +14,8 @@ from bs4 import BeautifulSoup
 import configparser
 import json
 import copy
-import http.client, http.cookiejar
+import http.client
+import http.cookiejar
 import asyncio
 import sys
 
@@ -62,13 +63,13 @@ def formatTimedifference(timeDifference):
 		hours = 0
 		days = 0
 		if minutes >= 60:
-			hours = int(minutes/60)
-			minutes = minutes - hours*60
+			hours = int(minutes / 60)
+			minutes = minutes - hours * 60
 		else:
 			return "{:02}min".format(minutes)
 		if hours >= 24:
-			days = int(hours/24)
-			hours = hours - days*24
+			days = int(hours / 24)
+			hours = hours - days * 24
 			return "{}d {:02d}:{:02d}h".format(days,hours,minutes)
 		else:
 			return "{:02d}:{:02d}h".format(hours,minutes)
@@ -97,8 +98,12 @@ async def pingIpAsync(ip,device,tries=1):
 		# -q: quiet
 		# -c 1: one try
 		# -W 3: timeout 3 secs
-		result = os.system("ping -qc 1 -W 3 {} >/dev/null".format(ip))
-		if result == 0:
+		sender = await asyncio.create_subprocess_exec("/bin/ping", "-qc", "1", "-W", "3", ip, stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+		output, errors = await sender.communicate()
+		if len(errors) > 0:
+			print(output.decode("utf-8"),file=sys.stderr)
+			print(errors.decode("utf-8"),file=sys.stderr)
+		if sender.returncode == 0:
 			if i != 0:
 				debugPrint("{}. Ping to {} ({}) successfull.".format(i,readableNameOf(device['mac'],True),ip))
 			return True
@@ -179,7 +184,7 @@ def mqttSendAllDevices(devices):
 		"topic": "devicesInNetwork",
 		"measurements": devicesInfo
 	}
-	#print(mqttDict)
+	# print(mqttDict)
 	mqttSend(mqttDict)
 
 def mqttSendStatusChange(deviceInfo):
@@ -196,16 +201,16 @@ def mqttSendStatusChange(deviceInfo):
 		}
 	}
 
-	#mqttSend(mqttDict)
+	# mqttSend(mqttDict)
 
 def mqttSend(jsonDict):
 	config = configparser.ConfigParser(delimiters='=')
 	config.read('config.ini')
 	jsonData = json.dumps(jsonDict)
-	#debugPrint("Writing JSON: {}".format(jsonData))
+	# debugPrint("Writing JSON: {}".format(jsonData))
 	sender = subprocess.Popen([config.get("Paths", "mqttPath")], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
 	output, errors = sender.communicate(jsonData.encode("utf-8"))
-	#debugPrint("Output: {}, errors: {}".format(output,errors))
+	# debugPrint("Output: {}, errors: {}".format(output,errors))
 
 def checkIfMacInDeviceList(devices,mac):
 	for device in devices:
@@ -224,7 +229,7 @@ def cameOnlineCheck(device):
 	if 'lastState' in device:
 		if device['lastState'] != 'up':
 			if device['lastSeen'] is not None:
-				timeDifference = datetime.datetime.utcnow()-device['lastSeen']
+				timeDifference = datetime.datetime.utcnow() - device['lastSeen']
 				message = "{} ⇑. Last seen {} ({} ago).".format(readableNameOf(device),formatTime(device['lastSeen']),formatTimedifference(timeDifference))
 
 			else:
@@ -243,8 +248,8 @@ def wentOfflineCheck(device):
 	if 'lastState' in device:
 		if device['lastState'] != 'down':
 			if device['lastOffline'] is not None and isinstance(device['lastOffline'],datetime.datetime):
-				timeDifference = datetime.datetime.utcnow()-device['lastOffline']
-				message ="{} ⇓. Online since {} ({} ago).".format(readableNameOf(device),formatTime(device['lastOffline']),formatTimedifference(timeDifference))
+				timeDifference = datetime.datetime.utcnow() - device['lastOffline']
+				message = "{} ⇓. Online since {} ({} ago).".format(readableNameOf(device), formatTime(device['lastOffline']), formatTimedifference(timeDifference))
 			else:
 				message = "{} ⇓.".format(readableNameOf(device))
 	else:
@@ -339,7 +344,7 @@ async def main():
 
 			lastSeenDiff = datetime.datetime.now() - device['lastSeen']
 			# check devices seen in the last week
-			checkPeriod = datetime.timedelta(seconds=7*24*60*60)
+			checkPeriod = datetime.timedelta(seconds=7 * 24 * 60 * 60)
 			debugPrint('	Checking last seen date: Last seen {}, which is {} ago.'.format(device['lastSeen'],lastSeenDiff))
 			if lastSeenDiff >= checkPeriod:
 				debugPrint('	Device has been last seen longer than a week ago. Ignoring.')
@@ -359,13 +364,13 @@ async def main():
 					debugPrint("X! Its IP {} is currenly owned by {}. Ignoring.".format(device['ip'],readableNameOf({'mac': currentOwner, 'name': currentOwner})))
 					continue
 				else:
-					#print("XX The IP {} of {} is currenly not owned by anyone. Pinging.".format(device['ip'],readableNameOf(device)))
+					# print("XX The IP {} of {} is currenly not owned by anyone. Pinging.".format(device['ip'],readableNameOf(device)))
 					pingIp(device['ip'],device)
 		elif macIp != device['ip']:
 			# mismatch between table IP and the one from the ARP cache. Should not happen
 			debugPrint("! Ignoring device {} because its IP {} is not {} which is assigned to its MAC {}.".format(readableNameOf(device),device['ip'],macIp,device['mac']))
 			continue
-		if not 'ip' in device.keys():
+		if 'ip' not in device.keys():
 			debugPrint("! Device {} has no known IP. Ignoring.".format(readableNameOf(device)))
 			continue
 		# ping device
