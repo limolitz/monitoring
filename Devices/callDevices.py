@@ -290,6 +290,7 @@ async def main():
 	devices = loadDevicelist()
 	clientsList = loadDevicesFromNmap()
 
+	futures = []
 	for client in clientsList:
 		# divide infos
 		# name elements
@@ -357,15 +358,12 @@ async def main():
 			# look if IP is assigned to someone else
 			debugPrint("X Device {} with MAC {} has no IP in ARP cache.".format(readableNameOf(device),device['mac']))
 			# if we know an IP of the device
-			# TODO? get IP from table info
+			# TODO: get IP from table info?
 			if 'ip' in device.keys():
 				currentOwner = getMacFromArp(device['ip'])
 				if currentOwner is not None:
 					debugPrint("X! Its IP {} is currenly owned by {}. Ignoring.".format(device['ip'],readableNameOf({'mac': currentOwner, 'name': currentOwner})))
 					continue
-				else:
-					# print("XX The IP {} of {} is currenly not owned by anyone. Pinging.".format(device['ip'],readableNameOf(device)))
-					pingIp(device['ip'],device)
 		elif macIp != device['ip']:
 			# mismatch between table IP and the one from the ARP cache. Should not happen
 			debugPrint("! Ignoring device {} because its IP {} is not {} which is assigned to its MAC {}.".format(readableNameOf(device),device['ip'],macIp,device['mac']))
