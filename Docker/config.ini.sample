@@ -1,0 +1,2 @@
+[Paths]
+mqttPath = ~/bin/mqttsend/mqttsend.sh
