@@ -65,11 +65,12 @@ def get_single_container_stats(container: dict):
     # TODO: get cpu
 
     # network stats
-    stats['interfaces'] = []
-    for interface, value_dict in decoded["networks"].items():
-        stats['interfaces'].append(interface)
-        stats['{}_rx_bytes'.format(interface)] = value_dict["rx_bytes"]
-        stats['{}_tx_bytes'.format(interface)] = value_dict["tx_bytes"]
+    if "networks" in decoded.keys():
+        stats['interfaces'] = []
+        for interface, value_dict in decoded["networks"].items():
+            stats['interfaces'].append(interface)
+            stats['{}_rx_bytes'.format(interface)] = value_dict["rx_bytes"]
+            stats['{}_tx_bytes'.format(interface)] = value_dict["tx_bytes"]
 
     # memory stats
     stats["memory_usage"] = decoded["memory_stats"]["usage"]
