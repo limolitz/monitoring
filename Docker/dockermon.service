@@ -1,0 +1,6 @@
+[Unit]
+Description=Docker Monitoring
+
+[Service]
+WorkingDirectory=/home/dockermonitoring/scripts/QuantifiedSelf/Docker
+ExecStart=/home/dockermonitoring/scripts/QuantifiedSelf/Docker/cron.sh
