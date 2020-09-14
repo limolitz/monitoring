@@ -2,22 +2,27 @@
 # log traffic on unix
 import subprocess
 import sqlite3 as sql
-import datetime
 import sys
 sys.path.insert(0,'..')
 import configparser
 import json
 import platform
 
-def trafficInBytes(selfPath,config):
-	if platform.system() == "Darwin":
-		return trafficInBytesMac(selfPath,config)
-	else:
-		return trafficInBytesLinux(selfPath,config)
+def getAllInterfaces():
+	ip = subprocess.Popen(["ip", "-json", "link", "show"],stdout=subprocess.PIPE)
+	output, errors = ip.communicate()
+	data = json.loads(output.decode("utf-8"))
+	names = [entry["ifname"] for entry in data]
+	return names
 
-def trafficInBytesLinux(selfPath,config):
+def trafficInBytes(interface):
+	if platform.system() == "Darwin":
+		return trafficInBytesMac(interface)
+	else:
+		return trafficInBytesLinux(interface)
+
+def trafficInBytesLinux(interface):
 	bytes = []
-	interface = format(config.get("Paths", "interface"))
 	with open("/sys/class/net/{}/statistics/rx_bytes".format(interface), "rb") as f:
 		content = f.read()
 		bytes.append(int(content))
@@ -26,8 +31,8 @@ def trafficInBytesLinux(selfPath,config):
 		bytes.append(int(content))
 	return bytes
 
-def trafficInBytesMac(selfPath,config):
-	netstat = subprocess.Popen(["netstat","-b","-n","-I",config.get("Paths", "interface")],stdout=subprocess.PIPE)
+def trafficInBytesMac(interface):
+	netstat = subprocess.Popen(["netstat","-b","-n","-I",interface],stdout=subprocess.PIPE)
 	output, errors = netstat.communicate()
 	# split by newlines
 	lines = output.decode("utf-8").split('\n')
@@ -49,18 +54,22 @@ if __name__ == '__main__':
 	config.read('config.ini')
 	selfPath = config.get("Paths", "selfPath")
 
-	uptime = uptimeInSeconds(selfPath)
-	traffic = trafficInBytes(selfPath,config)
-	mqttObject = {
-		"topic": "traffic",
-		"measurements": {
-			"uptime": uptime,
-			"trafficReceived": int(traffic[0]),
-			"trafficTransmitted": int(traffic[1])
+	interfaces = getAllInterfaces()
+	for interface in interfaces:
+
+		uptime = uptimeInSeconds(selfPath)
+		traffic = trafficInBytes(interface)
+		mqttObject = {
+			"topic": "traffic",
+			"name": interface,
+			"measurements": {
+				"uptime": uptime,
+				"{}_rx_bytes".format(interface): int(traffic[0]),
+				"{}_tx_bytes".format(interface): int(traffic[1])
+			}
 		}
-	}
-	json = json.dumps(mqttObject)
-	print("Writing JSON: {}".format(json))
-	sender = subprocess.Popen([config.get("Paths", "mqttPath")], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
-	output, errors = sender.communicate(json.encode("utf-8"))
-	print(output.decode("utf-8"),errors.decode("utf-8"))
+		jsonObject = json.dumps(mqttObject)
+		print("Writing JSON: {}".format(jsonObject))
+		sender = subprocess.Popen([config.get("Paths", "mqttPath")], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+		output, errors = sender.communicate(jsonObject.encode("utf-8"))
+		print(output.decode("utf-8"),errors.decode("utf-8"))

@@ -1,4 +1,3 @@
 [Paths]
 selfPath = /usr/local/bin/QuantifiedSelf/Traffic/
 mqttPath = /usr/local/bin/mqttsend/mqttsend.sh
-interface = eth0
