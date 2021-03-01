@@ -51,7 +51,7 @@ def get_single_container_info(container: dict):
     )
     output, errors = docker_curl.communicate()
     if errors:
-        print("Error", errors)
+        print("Error: {}".format(errors))
         exit(1)
     decoded = json.loads(output.decode('utf-8'))
     state = decoded['State']
@@ -74,7 +74,7 @@ def get_single_container_stats(container: dict):
     output, errors = docker_curl.communicate()
     stats = {}
     if errors:
-        print("Error", errors)
+        print("Error: {}".format(errors))
         exit(1)
     decoded = json.loads(output.decode('utf-8'))
 
@@ -89,8 +89,10 @@ def get_single_container_stats(container: dict):
             stats['{}_tx_bytes'.format(interface)] = value_dict["tx_bytes"]
 
     # memory stats
-    if "memory_stats" in decoded.keys():
+    try:
         stats["memory_usage"] = decoded["memory_stats"]["usage"]
+    except KeyError:
+        pass
 
     return stats
 
