@@ -7,7 +7,6 @@ sys.path.insert(0,'..')
 import configparser
 import json
 import platform
-from pathlib import Path
 
 def getAllInterfaces():
 	ip = subprocess.Popen(["ip", "-json", "link", "show"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -43,17 +42,13 @@ def trafficInBytes(interface):
 
 def trafficInBytesLinux(interface):
 	bytes = []
-	rx_bytes = Path("/sys/class/net/{}/statistics/rx_bytes".format(interface))
-	tx_bytes = Path("/sys/class/net/{}/statistics/tx_bytes".format(interface))
-	if rx_bytes.is_file() and tx_bytes.is_file():
-		with rx_bytes.open("rb") as f:
-			content = f.read()
-			bytes.append(int(content))
-		with tx_bytes.open("rb") as f:
-			content = f.read()
-			bytes.append(int(content))
-		return bytes
-	return None
+	with open("/sys/class/net/{}/statistics/rx_bytes".format(interface), "rb") as f:
+		content = f.read()
+		bytes.append(int(content))
+	with open("/sys/class/net/{}/statistics/tx_bytes".format(interface), "rb") as f:
+		content = f.read()
+		bytes.append(int(content))
+	return bytes
 
 def trafficInBytesMac(interface):
 	netstat = subprocess.Popen(["netstat","-b","-n","-I",interface],stdout=subprocess.PIPE)
@@ -86,10 +81,6 @@ if __name__ == '__main__':
 
 		uptime = uptimeInSeconds(selfPath)
 		traffic = trafficInBytes(interface)
-		if traffic is None:
-			print("Error on reading data for interface {}.".format(interface))
-			continue
-
 		mqttObject = {
 			"topic": "traffic",
 			"name": interface,
