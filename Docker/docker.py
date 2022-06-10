@@ -5,13 +5,9 @@ import json
 from datetime import datetime, timezone
 import time
 
-
 def get_running_containers():
     containers = {}
-    docker_curl = subprocess.Popen(
-        ["curl", "-o", "-", "-s", "-S", "--unix-socket", "/var/run/docker.sock", "http://localhost/containers/json"],
-        stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE
-    )
+    docker_curl = subprocess.Popen(["curl", "-o", "-", "-s", "-S", "--unix-socket", "/var/run/docker.sock", "http://localhost/containers/json"], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
     output, errors = docker_curl.communicate()
     if errors:
         print("Error", errors)
@@ -42,16 +38,10 @@ def get_running_containers():
 
 
 def get_single_container_info(container: dict):
-    docker_curl = subprocess.Popen(
-        [
-            "curl", "-o", "-", "-s", "-S", "--unix-socket", "/var/run/docker.sock",
-            "http://localhost/containers/{}/json".format(container['id'])
-        ],
-        stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE
-    )
+    docker_curl = subprocess.Popen(["curl", "-o", "-", "-s", "-S", "--unix-socket", "/var/run/docker.sock", "http://localhost/containers/{}/json".format(container['id'])], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
     output, errors = docker_curl.communicate()
     if errors:
-        print("Error: {}".format(errors))
+        print("Error", errors)
         exit(1)
     decoded = json.loads(output.decode('utf-8'))
     state = decoded['State']
@@ -64,17 +54,11 @@ def get_single_container_info(container: dict):
 
 
 def get_single_container_stats(container: dict):
-    docker_curl = subprocess.Popen(
-        [
-            "curl", "-o", "-", "-s", "-S", "--unix-socket", "/var/run/docker.sock",
-            "http://localhost/containers/{}/stats?stream=false".format(container['id'])
-        ],
-        stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE
-    )
+    docker_curl = subprocess.Popen(["curl", "-o", "-", "-s", "-S", "--unix-socket", "/var/run/docker.sock", "http://localhost/containers/{}/stats?stream=false".format(container['id'])], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
     output, errors = docker_curl.communicate()
     stats = {}
     if errors:
-        print("Error: {}".format(errors))
+        print("Error", errors)
         exit(1)
     decoded = json.loads(output.decode('utf-8'))
 
@@ -89,10 +73,7 @@ def get_single_container_stats(container: dict):
             stats['{}_tx_bytes'.format(interface)] = value_dict["tx_bytes"]
 
     # memory stats
-    try:
-        stats["memory_usage"] = decoded["memory_stats"]["usage"]
-    except KeyError:
-        pass
+    stats["memory_usage"] = decoded["memory_stats"]["usage"]
 
     return stats
 
@@ -123,10 +104,7 @@ if __name__ == '__main__':
         json_object = json.dumps(mqttObject)
         print("Writing JSON: {}".format(json_object))
 
-        sender = subprocess.Popen(
-            [config.get("Paths", "mqttPath")],
-            stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE
-        )
+        sender = subprocess.Popen([config.get("Paths", "mqttPath")], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
         output, errors = sender.communicate(json_object.encode("utf-8"))
         print(output.decode("utf-8"), errors.decode("utf-8"))
 
