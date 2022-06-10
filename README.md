@@ -14,3 +14,8 @@ Currently working scripts:
 
 Possible future features:
 * Logging of visited sites and duration in Firefox
+
+
+## Systemd timers
+
+Some of the scripts should be run via a classical cronjob, some rather with a systemd timer. To set this up, copy the `.service` and `.timer` files to `~/.config/systemd/user`, adjust the paths inside them and run `systemctl enable --user --now UNIT.timer`.
