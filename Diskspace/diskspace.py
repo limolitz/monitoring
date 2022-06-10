@@ -3,12 +3,14 @@ import subprocess
 import datetime
 import json
 import configparser
+import sys
 
 def getFilesystemInfo(filesystem):
 	proc = subprocess.Popen("df {} | grep {}".format(filesystem,filesystem), stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
 	output, errors = proc.communicate()
+	if len(errors) > 0:
+		print("An error occured: {}".format(errors.decode("utf-8")),file=sys.stderr)
 	parsedOutput = list(filter(None, output.decode("utf-8").split(" ")))
-	print("{}".format(parsedOutput))
 	used = int(parsedOutput[2])
 	available = int(parsedOutput[3])
 	print("Filesystem {} has {} used and {} available of {}.".format(filesystem,used,available,used+available))
