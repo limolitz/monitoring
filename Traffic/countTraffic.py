@@ -70,7 +70,7 @@ def trafficInBytesMac(interface):
 
 def uptimeInSeconds():
     # get uptime in seconds
-    uptime = int(subprocess.Popen("getUptimeSeconds.sh", stdout=subprocess.PIPE).stdout.read())
+    uptime = int(subprocess.Popen("./getUptimeSeconds.sh", stdout=subprocess.PIPE).stdout.read())
     print(f'Uptime: {uptime}s')
     return uptime
 
