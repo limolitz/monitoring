@@ -38,4 +38,6 @@ sender = subprocess.Popen(
 )
 output, errors = sender.communicate(json.encode("utf-8"))
 _logger.debug(output.decode("utf-8"))
-_logger.error(errors.decode("utf-8"))
+if errors:
+    _logger.error(errors.decode("utf-8"))
+    exit(1)
