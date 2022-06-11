@@ -1,0 +1,8 @@
+[Unit]
+Description=CPU Monitoring
+
+[Service]
+WorkingDirectory=/home/monitoring/scripts/monitoring/CPU
+ExecStart=/home/monitoring/scripts/monitoring/CPU/cron.sh
+User=monitoring
+Group=monitoring
