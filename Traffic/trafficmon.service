@@ -1,0 +1,8 @@
+[Unit]
+Description=Traffic Monitoring
+
+[Service]
+WorkingDirectory=/home/monitoring/scripts/monitoring/Traffic
+ExecStart=/home/monitoring/scripts/monitoring/Traffic/cron.sh
+User=monitoring
+Group=monitoring
