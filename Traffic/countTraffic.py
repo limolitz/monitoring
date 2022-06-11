@@ -68,9 +68,9 @@ def trafficInBytesMac(interface):
     return bytes
 
 
-def uptimeInSeconds(selfPath):
+def uptimeInSeconds():
     # get uptime in seconds
-    uptime = int(subprocess.Popen(f"{selfPath}/getUptimeSeconds.sh", stdout=subprocess.PIPE).stdout.read())
+    uptime = int(subprocess.Popen("getUptimeSeconds.sh", stdout=subprocess.PIPE).stdout.read())
     print(f'Uptime: {uptime}s')
     return uptime
 
@@ -78,7 +78,6 @@ def uptimeInSeconds(selfPath):
 if __name__ == '__main__':
     config = configparser.ConfigParser()
     config.read('config.ini')
-    selfPath = config.get("Paths", "selfPath")
 
     interfaces = getAllInterfaces()
     if interfaces is None:
@@ -86,7 +85,7 @@ if __name__ == '__main__':
         exit(1)
     for interface in interfaces:
 
-        uptime = uptimeInSeconds(selfPath)
+        uptime = uptimeInSeconds()
         traffic = trafficInBytes(interface)
         mqttObject = {
             "topic": "traffic",
