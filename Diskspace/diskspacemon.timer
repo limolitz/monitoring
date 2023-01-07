@@ -1,0 +1,8 @@
+[Unit]
+Description=Run diskspacemon once a day
+
+[Timer]
+OnCalendar=daily
+
+[Install]
+WantedBy=timers.target

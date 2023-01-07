@@ -1,0 +1,8 @@
+[Unit]
+Description=Diskspace Monitoring
+
+[Service]
+WorkingDirectory=/home/monitoring/scripts/monitoring/Diskspace
+ExecStart=/home/monitoring/scripts/monitoring/Diskspace/cron.sh
+User=monitoring
+Group=monitoring
