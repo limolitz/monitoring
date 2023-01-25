@@ -2,7 +2,7 @@
 Description=RAM Monitoring
 
 [Service]
-WorkingDirectory=/home/monitoring/scripts/monitoring/CPU
-ExecStart=/home/monitoring/scripts/monitoring/CPU/cron.sh
+WorkingDirectory=/home/monitoring/scripts/monitoring/RAM
+ExecStart=/home/monitoring/scripts/monitoring/RAM/cron.sh
 User=monitoring
 Group=monitoring
