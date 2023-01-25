@@ -2,5 +2,7 @@
 Description=Docker Monitoring
 
 [Service]
-WorkingDirectory=/home/dockermonitoring/scripts/QuantifiedSelf/Docker
-ExecStart=/home/dockermonitoring/scripts/QuantifiedSelf/Docker/cron.sh
+WorkingDirectory=/home/monitoring/scripts/monitoring/Docker
+ExecStart=/home/monitoring/scripts/monitoring/Docker/cron.sh
+User=monitoring
+Group=monitoring
