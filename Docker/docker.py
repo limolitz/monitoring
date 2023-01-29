@@ -73,7 +73,10 @@ def get_single_container_stats(container: dict):
             stats['{}_tx_bytes'.format(interface)] = value_dict["tx_bytes"]
 
     # memory stats
-    stats["memory_usage"] = decoded["memory_stats"]["usage"]
+    try:
+        stats["memory_usage"] = decoded["memory_stats"]["usage"]
+    except KeyError:
+        pass
 
     return stats
 
